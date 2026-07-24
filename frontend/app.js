@@ -2,6 +2,13 @@
    Sidebar con Descargas + categorias + tus Temas; panel principal con el
    contenido real de la carpeta seleccionada; ajustes en un dialog aparte. */
 
+(function initTheme() {
+    const theme = localStorage.getItem("martix_theme") || localStorage.getItem("sortix_theme") || "dark";
+    if (theme === "light") {
+        document.documentElement.classList.add("light");
+    }
+})();
+
 const TRANSLATIONS = {
     es: {
         patrol_label: "Auto-Organizar",
