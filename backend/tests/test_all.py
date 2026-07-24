@@ -336,7 +336,22 @@ moves = db.recent_moves(10)
 maint_moves = [m for m in moves if m["category"] == "mantenimiento"]
 assert len(maint_moves) == 1
 assert maint_moves[0]["filename"] == "delete_old.txt"
-assert maint_moves[0]["destination"] == "DELETED"
+# El mantenimiento envia a la papelera, no hace unlink(): el destino registra
+# por que via se fue el archivo, y la fila no es reversible desde el historial.
+assert maint_moves[0]["destination"].startswith("papelera:"), maint_moves[0]
+assert maint_moves[0]["undoable"] is False
+assert resp["items"][0]["trash_method"] in ("native", "quarantine")
+
+# El archivo debe poder recuperarse desde la papelera de Martix
+from app import trash as _trash  # noqa: E402
+if resp["items"][0]["trash_method"] == "quarantine":
+    entries = _trash.list_trash()
+    assert any(e["name"] == "delete_old.txt" for e in entries), entries
+    entry_id = next(e["id"] for e in entries if e["name"] == "delete_old.txt")
+    restored, err = _trash.restore(entry_id)
+    assert err is None, err
+    assert file3.exists(), "el archivo debe volver a su ruta original"
+    file3.unlink()
 
 # Eliminar regla y limpiar
 r = client.delete(f"/api/maintenance/rules/{rule_id}")
@@ -381,8 +396,14 @@ try:
     
     r = client.post("/api/duplicates/clean", json=[dup1_rel_path])
     assert r.status_code == 200
-    assert r.get_json() == {"success": True, "deleted": 1}
-    
+    clean_body = r.get_json()
+    # La limpieza envia a la papelera en vez de hacer unlink(): "es un
+    # duplicado" es una conclusion del hash, y debe poder revertirse.
+    assert clean_body["success"] is True, clean_body
+    assert clean_body["deleted"] == 1, clean_body
+    assert clean_body["trashed"] is True, clean_body
+    assert clean_body["failed"] == [], clean_body
+
     assert not (downloads / "dup1.pdf").exists()
     assert (downloads / "dup2.pdf").exists()
 
@@ -722,6 +743,11 @@ with patch("subprocess.Popen") as mock_popen:
 with patch("app.watcher.send_notification") as mock_send_notif:
     with patch.object(_DownloadEventHandler, "_wait_until_stable", return_value=True):
         handler = _DownloadEventHandler()
+        # Los hilos worker se crean bajo demanda: construir el handler (que
+        # ocurre al importar server.py) ya no deja 4 hilos vivos con la
+        # patrulla apagada. PatrolManager.start() los arranca por su cuenta.
+        assert not handler._workers_started
+        handler.ensure_workers()
         test_file = downloads / "notif_test.txt"
         test_file.write_text("contenido notificacion test")
         

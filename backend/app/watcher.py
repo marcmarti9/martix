@@ -41,15 +41,30 @@ def send_notification(title: str, message: str) -> None:
                 )
                 subprocess.Popen(["osascript", "-e", script, title, message])
             elif sys.platform == "win32":
+                # Toast nativo del centro de notificaciones. Antes se usaba
+                # MessageBox::Show, que abre un dialogo MODAL: organizar 30
+                # descargas apilaba 30 ventanas robando el foco y exigiendo un
+                # clic en cada una.
                 ps_script = (
                     "param([string]$Title, [string]$Message) "
-                    "Add-Type -AssemblyName System.Windows.Forms; "
-                    "[System.Windows.Forms.MessageBox]::Show($Message, $Title) | Out-Null"
+                    "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, "
+                    "ContentType=WindowsRuntime] > $null; "
+                    "$template = [Windows.UI.Notifications.ToastNotificationManager]::"
+                    "GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); "
+                    "$nodes = $template.GetElementsByTagName('text'); "
+                    "$nodes.Item(0).AppendChild($template.CreateTextNode($Title)) > $null; "
+                    "$nodes.Item(1).AppendChild($template.CreateTextNode($Message)) > $null; "
+                    "$toast = [Windows.UI.Notifications.ToastNotification]::new($template); "
+                    "[Windows.UI.Notifications.ToastNotificationManager]::"
+                    "CreateToastNotifier('Martix').Show($toast)"
                 )
                 subprocess.Popen(
-                    ["powershell", "-NoProfile", "-Command", ps_script, "-Title", title, "-Message", message]
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script,
+                     "-Title", title, "-Message", message],
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
         except Exception:
+            # Nunca dejar que un fallo de notificacion afecte al archivado.
             pass
 
     threading.Thread(target=_notify, daemon=True).start()
@@ -79,17 +94,36 @@ def _get_dir_stats(dir_path: Path) -> tuple[int, int, bool]:
     return total_size, file_count, has_temp
 
 
+WORKER_COUNT = 4
+# Cola acotada: una descarga masiva (o un `cp` de miles de archivos) no puede
+# hacer crecer la memoria sin limite. Al llenarse se descartan los eventos
+# nuevos, que el barrido periodico del scheduler recogera igualmente.
+MAX_QUEUED_ITEMS = 500
+
+
 class _DownloadEventHandler(FileSystemEventHandler):
     def __init__(self):
         super().__init__()
         self._in_progress: set[Path] = set()
         self._lock = threading.Lock()
-        
-        # Sistema de cola para limitar la concurrencia a exactamente 4 hilos demonio,
-        # previniendo la caida del sistema por explosion de hilos (DoS).
-        self._queue = queue.Queue()
-        for _ in range(4):
-            threading.Thread(target=self._worker, daemon=True).start()
+
+        # Sistema de cola para limitar la concurrencia a un numero fijo de hilos
+        # demonio, previniendo la caida del sistema por explosion de hilos (DoS).
+        # Los hilos se crean de forma PEREZOSA: construir el handler (que ocurre
+        # al importar server.py) no debe dejar 4 hilos vivos aunque la patrulla
+        # este apagada.
+        self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUED_ITEMS)
+        self._workers_started = False
+
+    def ensure_workers(self) -> None:
+        with self._lock:
+            if self._workers_started:
+                return
+            for i in range(WORKER_COUNT):
+                threading.Thread(
+                    target=self._worker, daemon=True, name=f"MartixWatcherWorker-{i}"
+                ).start()
+            self._workers_started = True
 
     def on_created(self, event):
         self._schedule(Path(event.src_path))
@@ -101,13 +135,24 @@ class _DownloadEventHandler(FileSystemEventHandler):
     def _schedule(self, path: Path):
         if is_temporary_download_file(path):
             return
-        if path.is_dir() and is_destination_or_reserved_dir(path):
+        try:
+            if path.is_dir() and is_destination_or_reserved_dir(path):
+                return
+        except OSError:
             return
         with self._lock:
             if path in self._in_progress:
                 return
             self._in_progress.add(path)
-        self._queue.put(path)
+        try:
+            self._queue.put_nowait(path)
+        except queue.Full:
+            with self._lock:
+                self._in_progress.discard(path)
+            print(
+                f"[Martix Watcher] cola llena, {path.name} se organizara en el proximo barrido",
+                file=sys.stderr,
+            )
 
     def _worker(self):
         while True:
@@ -210,6 +255,7 @@ class PatrolManager:
 
         self._observer: Observer | None = None
         self._watches: dict[Path, object] = {}
+        self._recursive = False
         self._lock = threading.Lock()
         self._handler = _DownloadEventHandler()
 
@@ -249,6 +295,19 @@ class PatrolManager:
             return
 
         target_dirs = set(self._get_target_directories())
+
+        # Si cambio el modo recursivo hay que reprogramar TODAS las vigilancias:
+        # watchdog fija ese flag al dar de alta cada una.
+        recursive_now = self._watch_recursive()
+        if recursive_now != self._recursive:
+            for watch in self._watches.values():
+                try:
+                    self._observer.unschedule(watch)
+                except Exception:
+                    pass
+            self._watches.clear()
+            self._recursive = recursive_now
+
         current_dirs = set(self._watches.keys())
 
         # Cancelar vigilancia de carpetas eliminadas
@@ -263,16 +322,33 @@ class PatrolManager:
         for d in target_dirs - current_dirs:
             try:
                 d.mkdir(parents=True, exist_ok=True)
-                watch = self._observer.schedule(self._handler, str(d), recursive=False)
+                watch = self._observer.schedule(self._handler, str(d), recursive=self._recursive)
                 self._watches[d] = watch
             except Exception as e:
                 print(f"[Martix Watcher Error] No se pudo vigilar {d}: {e}", file=sys.stderr)
+
+    @staticmethod
+    def _watch_recursive() -> bool:
+        """Vigilancia recursiva (opcional, apagada por defecto).
+
+        Con la vigilancia plana, un archivo que el navegador crea directamente
+        dentro de ~/Descargas/subcarpeta no dispara ningun evento y solo se
+        recoge cuando la carpeta entera se organiza. Activarla hace que se
+        archive cada archivo por separado, lo que deshace la estructura de
+        carpetas descargadas: por eso es una decision del usuario.
+        """
+        try:
+            from app import db
+            return str(db.get_setting("watch_recursive", "0")).strip().lower() in ("1", "true", "yes", "on")
+        except Exception:
+            return False
 
     def start(self) -> None:
         with self._lock:
             if self.is_active():
                 self._update_watches_locked()
                 return
+            self._handler.ensure_workers()
             observer = Observer()
             observer.start()
             self._observer = observer

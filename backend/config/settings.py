@@ -3,6 +3,7 @@ y el fichero de categorias. Sin dependencias externas para que corra en
 cualquier maquina modesta."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -53,6 +54,26 @@ DOWNLOADS_DIR = Path(_downloads_override).expanduser() if _downloads_override el
 
 HOME_DIR = Path.home()
 
+
+def _default_data_dir() -> Path:
+    """Carpeta de datos de Martix segun la convencion de cada plataforma.
+    Aqui vive la papelera propia (cuarentena) de los borrados."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or (HOME_DIR / "AppData" / "Local")
+        return Path(base) / "Martix"
+    if sys.platform == "darwin":
+        return HOME_DIR / "Library" / "Application Support" / "Martix"
+    base = os.environ.get("XDG_DATA_HOME") or (HOME_DIR / ".local" / "share")
+    return Path(base) / "martix"
+
+
+DATA_DIR = Path(_env.get("MARTIX_DATA_DIR", "").strip()).expanduser() if _env.get("MARTIX_DATA_DIR", "").strip() else _default_data_dir()
+TRASH_DIR = DATA_DIR / "trash"
+
+# Dias que se conservan los archivos en la papelera de Martix antes de
+# purgarse definitivamente.
+TRASH_RETENTION_DAYS = int(_env.get("MARTIX_TRASH_RETENTION_DAYS", "30"))
+
 # Token compartido para la API (cabecera X-Martix-Token). Opcional mientras
 # Martix escuche solo en 127.0.0.1; obligatorio si se expone HOST a la red.
 API_TOKEN = _env.get("MARTIX_TOKEN", _env.get("SORTIX_TOKEN", "")).strip()
@@ -96,46 +117,65 @@ IGNORED_PREFIXES = (
 
 
 def is_temporary_download_file(path: Path) -> bool:
-    """Comprueba si un archivo es un artefacto temporal o parcial de descarga del navegador."""
+    """Comprueba si un archivo es un artefacto temporal o parcial de descarga
+    del navegador.
+
+    Solo se mira el SUFIJO real y los prefijos conocidos. Buscar ".part" como
+    subcadena en cualquier posicion marcaba como temporales archivos
+    perfectamente normales ("pelicula.part1.rar", "datos.partition.csv",
+    "informe.particular.pdf"), que quedaban sin archivar para siempre.
+    """
     name_lower = path.name.lower()
-    suffix_lower = path.suffix.lower()
 
-    if suffix_lower in IGNORED_SUFFIXES:
+    if path.suffix.lower() in IGNORED_SUFFIXES:
         return True
 
-    for pref in IGNORED_PREFIXES:
-        if name_lower.startswith(pref):
-            return True
-
-    if ".crdownload" in name_lower or ".part" in name_lower:
-        return True
-
-    return False
+    return any(name_lower.startswith(pref) for pref in IGNORED_PREFIXES)
 
 
 def is_file_in_use(path: Path) -> bool:
-    """Comprueba si un archivo está siendo escrito o mantenido abierto por otra aplicación (p.ej. el navegador)."""
+    """Comprueba si un archivo está siendo escrito o mantenido abierto por otra
+    aplicación (p.ej. el navegador).
+
+    Importante: un archivo de SOLO LECTURA (modo 0444, adjunto, medio montado)
+    no esta "en uso". Antes se abria siempre en "r+b", asi que el
+    PermissionError por falta de permiso de escritura se confundia con un
+    bloqueo y esos archivos no se archivaban nunca.
+    """
     if not path.exists() or not path.is_file():
         return False
 
-    # Prueba de apertura/bloqueo exclusivo de archivo
     if sys.platform == "win32":
+        # En Windows el propio open() falla si otro proceso tiene el archivo
+        # abierto en exclusiva. Para archivos de solo lectura se prueba en
+        # modo lectura, que sigue detectando el bloqueo exclusivo.
+        mode = "r+b" if os.access(path, os.W_OK) else "rb"
         try:
-            with open(path, "r+b"):
-                pass
-        except (PermissionError, OSError):
+            with open(path, mode):
+                return False
+        except OSError:
             return True
-    else:
-        try:
-            import fcntl
-            with open(path, "r+b") as f:
-                try:
-                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-                except (IOError, OSError):
-                    return True
-        except (PermissionError, OSError):
-            return True
+
+    try:
+        import fcntl
+    except ImportError:  # plataforma sin flock: no se puede saber
+        return False
+
+    try:
+        # flock() no exige permiso de escritura, asi que "rb" basta y ademas
+        # funciona con archivos de solo lectura.
+        with open(path, "rb") as f:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                return True
+    except PermissionError:
+        # Ni siquiera se puede leer: no es cosa de un bloqueo, y bloquear el
+        # archivado aqui solo dejaria el archivo dando vueltas en la cola.
+        return False
+    except OSError:
+        return True
 
     return False
 

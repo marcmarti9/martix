@@ -72,6 +72,14 @@ const TRANSLATIONS = {
         cond_op_ends_with: "Termina con",
         cond_op_gt: "Mayor que",
         cond_op_lt: "Menor que",
+        cond_op_gte: "Mayor o igual que",
+        cond_op_lte: "Menor o igual que",
+        rule_order_hint: "Orden de evaluación: gana la primera regla que coincide",
+        rule_move_up: "Subir (evaluar antes)",
+        rule_move_down: "Bajar (evaluar después)",
+        disk_scan_truncated: "Escaneo parcial: la carpeta es demasiado grande y se alcanzó el límite de tiempo. Los totales mostrados son incompletos.",
+        confirm_delete_folder: "Vas a enviar a la papelera una carpeta con {n} archivos. ¿Continuar?",
+        status_moved_to_trash: "Enviado a la papelera",
         cond_value_placeholder: "Valor",
         status_settings_saved: "Ajustes del sistema guardados.",
         status_settings_save_error: "No se pudo guardar la configuración.",
@@ -317,6 +325,14 @@ const TRANSLATIONS = {
         cond_op_ends_with: "Ends with",
         cond_op_gt: "Greater than",
         cond_op_lt: "Less than",
+        cond_op_gte: "Greater than or equal",
+        cond_op_lte: "Less than or equal",
+        rule_order_hint: "Evaluation order: the first matching rule wins",
+        rule_move_up: "Move up (evaluate earlier)",
+        rule_move_down: "Move down (evaluate later)",
+        disk_scan_truncated: "Partial scan: the folder is too large and the time limit was reached. The totals shown are incomplete.",
+        confirm_delete_folder: "You are about to move a folder with {n} files to the trash. Continue?",
+        status_moved_to_trash: "Moved to trash",
         cond_value_placeholder: "Value",
         status_settings_saved: "System settings saved.",
         status_settings_save_error: "Could not save configuration.",
@@ -800,10 +816,37 @@ function renderSidebar() {
     }
 }
 
+// Escapa texto para insertarlo en HTML, INCLUIDO dentro de atributos.
+//
+// La version anterior hacia `div.textContent = text; return div.innerHTML`, que
+// solo escapa & < >. Los nombres de archivo los controla quien envia la
+// descarga, asi que una carpeta llamada  x" onmouseover="..."  se salia del
+// atributo title="" del analizador de espacio y ejecutaba JavaScript en el
+// origen de Martix, con acceso a toda la API local (incluidos los endpoints de
+// borrado). Las comillas y el acento grave TIENEN que escaparse aqui.
 function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return "";
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+        .replace(/`/g, "&#96;");
+}
+
+// Coacciona un valor del servidor a numero antes de meterlo en un atributo
+// style. Los porcentajes y tamanos vienen calculados del backend, pero si un
+// dia llegasen como cadena se colarian dentro del CSS de la pagina.
+function safeNumber(value, fallback = 0) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+// Solo permite colores en formato #rgb / #rrggbb; cualquier otra cosa cae al
+// gris neutro en vez de inyectarse tal cual en el atributo style.
+function safeColor(value, fallback = "#94a3b8") {
+    return /^#[0-9a-fA-F]{3,8}$/.test(String(value || "")) ? String(value) : fallback;
 }
 
 // ---- navegacion / breadcrumbs --------------------------------------------
@@ -1095,6 +1138,8 @@ function createConditionRow(data = {}) {
             <option value="ends_with">${t("cond_op_ends_with")}</option>
             <option value="gt">${t("cond_op_gt")}</option>
             <option value="lt">${t("cond_op_lt")}</option>
+            <option value="gte">${t("cond_op_gte")}</option>
+            <option value="lte">${t("cond_op_lte")}</option>
         </select>
         <input type="text" class="cond-value" placeholder="${t("cond_value_placeholder")}" style="flex: 2; min-width: 100px; padding: 6px; background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--color-input-text); border-radius: 6px; font-size: 0.85rem;">
         <button type="button" class="btn-remove-cond icon-btn danger" style="padding: 6px 10px; font-size: 0.95rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-input); background: var(--bg-item-hover); color: var(--color-danger);">&times;</button>
@@ -1141,6 +1186,7 @@ async function refreshRules() {
     if (rules.length === 0) {
         rulesListEl.innerHTML = `<li class="empty">${t("rules_empty")}</li>`;
     }
+    let index = 0;
     for (const rule of rules) {
         const li = document.createElement("li");
         
@@ -1166,12 +1212,50 @@ async function refreshRules() {
             ? `<div class="rule-details" style="font-size: 0.75rem; margin-top: 4px; color: var(--color-text-muted);">${details.join(" | ")}</div>`
             : "";
             
+        // El orden decide que regla gana cuando varias casan con el mismo
+        // archivo, asi que se muestra y se puede cambiar.
         li.innerHTML = `
             <div class="settings-item-main" style="display: flex; flex-direction: column;">
-                <div><strong>.${escapeHtml(rule.extension)}</strong> <span class="muted">&rarr; ${escapeHtml(rule.destination)}</span></div>
+                <div>
+                    <span class="rule-order-badge" title="${escapeHtml(t("rule_order_hint"))}">${index + 1}</span>
+                    <strong>.${escapeHtml(rule.extension)}</strong>
+                    <span class="muted">&rarr; ${escapeHtml(rule.destination)}</span>
+                </div>
                 ${detailsStr}
             </div>
         `;
+
+        const actions = document.createElement("div");
+        actions.style.display = "flex";
+        actions.style.gap = "4px";
+
+        const moveRule = async (delta) => {
+            const ids = rules.map(r => r.id);
+            const from = index;
+            const to = from + delta;
+            if (to < 0 || to >= ids.length) return;
+            [ids[from], ids[to]] = [ids[to], ids[from]];
+            await fetchJSON("/api/rules/reorder", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids }),
+            });
+            await refreshRules();
+        };
+
+        const upBtn = document.createElement("button");
+        upBtn.className = "icon-btn";
+        upBtn.textContent = "↑";
+        upBtn.title = t("rule_move_up");
+        upBtn.disabled = index === 0;
+        upBtn.addEventListener("click", () => moveRule(-1));
+
+        const downBtn = document.createElement("button");
+        downBtn.className = "icon-btn";
+        downBtn.textContent = "↓";
+        downBtn.title = t("rule_move_down");
+        downBtn.disabled = index === rules.length - 1;
+        downBtn.addEventListener("click", () => moveRule(1));
 
         const delBtn = document.createElement("button");
         delBtn.className = "icon-btn danger";
@@ -1181,8 +1265,11 @@ async function refreshRules() {
             await fetchJSON(`/api/rules/${rule.id}`, { method: "DELETE" });
             await refreshRules();
         });
-        li.appendChild(delBtn);
+
+        actions.append(upBtn, downBtn, delBtn);
+        li.appendChild(actions);
         rulesListEl.appendChild(li);
+        index += 1;
     }
 }
 
@@ -1260,7 +1347,10 @@ async function refreshHistory() {
             <span class="muted">${escapeHtml(move.category)} &rarr; ${escapeHtml(move.destination)}</span>
             <span class="keywords">${escapeHtml(formatDate(move.moved_at))}${undoneText}</span>
         </div>`;
-        if (!move.undone_at) {
+        // Un desempaquetado o un borrado de mantenimiento no son movimientos
+        // reversibles: el backend los marca con undoable=false y aqui no se
+        // ofrece un boton "Deshacer" que siempre iba a responder 409.
+        if (!move.undone_at && move.undoable !== false) {
             const actionContainer = document.createElement("div");
             actionContainer.style.display = "flex";
             actionContainer.style.gap = "6px";
@@ -1586,7 +1676,7 @@ async function refreshStatistics() {
                 row.innerHTML = `
                     <span class="stats-bar-label">${escapeHtml(name)}</span>
                     <div class="stats-bar-track">
-                        <div class="stats-bar-fill" style="width: ${pct}%; background-color: ${color};"></div>
+                        <div class="stats-bar-fill" style="width: ${safeNumber(pct)}%; background-color: ${safeColor(color)};"></div>
                     </div>
                     <span class="stats-bar-value">${count}</span>
                 `;
@@ -1610,7 +1700,7 @@ async function refreshStatistics() {
                 const bar = document.createElement("div");
                 bar.className = "stats-day-bar";
                 bar.title = `${day.day || ""}: ${count}`;
-                bar.innerHTML = `<div class="stats-day-fill" style="height: ${heightPct}%; background-color: ${color};"></div>`;
+                bar.innerHTML = `<div class="stats-day-fill" style="height: ${safeNumber(heightPct)}%; background-color: ${safeColor(color)};"></div>`;
                 chart.appendChild(bar);
             });
             actChart.appendChild(chart);
@@ -2106,7 +2196,14 @@ async function runDiskAnalyzerScan() {
 function renderDiskAnalyzerSummary() {
     if (!diskAnalyzerData) return;
     const statusElem = document.getElementById("disk-analyzer-scan-status");
-    if (statusElem) statusElem.textContent = `Escaneo completado en ${diskAnalyzerData.scan_time_seconds} s`;
+    if (statusElem) {
+        // El backend acota el escaneo por tiempo: si lo corta, hay que decirlo
+        // en vez de presentar totales incompletos como si fueran definitivos.
+        statusElem.textContent = diskAnalyzerData.truncated
+            ? `⚠️ ${t("disk_scan_truncated")} (${diskAnalyzerData.scan_time_seconds} s)`
+            : `Escaneo completado en ${diskAnalyzerData.scan_time_seconds} s`;
+        statusElem.classList.toggle("warning", Boolean(diskAnalyzerData.truncated));
+    }
     
     const totalSpaceElem = document.getElementById("disk-analyzer-total-space");
     if (totalSpaceElem) totalSpaceElem.textContent = diskAnalyzerData.disk_info.total_space_formatted || "--";
@@ -2147,7 +2244,7 @@ function renderDiskAnalyzerTree() {
 
         tr.innerHTML = `
             <td>
-                <div class="disk-analyzer-cell-name" style="padding-left: ${indentPx}px">
+                <div class="disk-analyzer-cell-name" style="padding-left: ${safeNumber(indentPx)}px">
                     ${expanderBtn}
                     ${iconSvg}
                     <span title="${escapeHtml(node.path)}">${escapeHtml(node.name)}</span>
@@ -2156,9 +2253,9 @@ function renderDiskAnalyzerTree() {
             <td>
                 <div class="disk-analyzer-bar-cell">
                     <div class="disk-analyzer-bar-mini">
-                        <div class="disk-analyzer-bar-mini-fill" style="width: ${node.percent_of_parent}%;"></div>
+                        <div class="disk-analyzer-bar-mini-fill" style="width: ${safeNumber(node.percent_of_parent)}%;"></div>
                     </div>
-                    <span>${node.percent_of_parent}%</span>
+                    <span>${safeNumber(node.percent_of_parent)}%</span>
                 </div>
             </td>
             <td><strong>${escapeHtml(node.size_formatted)}</strong></td>
@@ -2190,7 +2287,7 @@ function renderDiskAnalyzerExtensions() {
         <tr>
             <td>
                 <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background: ${ext.color}; display: inline-block;"></span>
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: ${safeColor(ext.color)}; display: inline-block;"></span>
                     <strong>${escapeHtml(ext.extension)}</strong>
                 </div>
             </td>
@@ -2199,9 +2296,9 @@ function renderDiskAnalyzerExtensions() {
             <td>
                 <div class="disk-analyzer-bar-cell">
                     <div class="disk-analyzer-bar-mini">
-                        <div class="disk-analyzer-bar-mini-fill" style="width: ${ext.percent}%; background: ${ext.color};"></div>
+                        <div class="disk-analyzer-bar-mini-fill" style="width: ${safeNumber(ext.percent)}%; background: ${safeColor(ext.color)};"></div>
                     </div>
-                    <span>${ext.percent}%</span>
+                    <span>${safeNumber(ext.percent)}%</span>
                 </div>
             </td>
         </tr>
@@ -2368,21 +2465,35 @@ if (btnDiskAnalyzerDelete) {
         }
 
         try {
-            const res = await fetch("/api/disk/delete", {
+            const deletedName = diskAnalyzerSelectedItem.name;
+            const postDelete = async (confirm) => await fetch("/api/disk/delete", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ path: targetPath })
+                body: JSON.stringify({ path: targetPath, confirm })
             });
 
+            let res = await postDelete(false);
+
+            // El backend exige confirmacion explicita para carpetas con muchos
+            // archivos: un clic accidental no puede vaciar una carpeta entera.
+            if (res.status === 409) {
+                const info = await res.json();
+                if (info.needs_confirmation) {
+                    const msg = t("confirm_delete_folder").replace("{n}", info.file_count);
+                    if (!window.confirm(msg)) return;
+                    res = await postDelete(true);
+                }
+            }
+
             if (res.ok) {
-                showStatusMessage(`Elemento eliminado: ${diskAnalyzerSelectedItem.name}`);
+                showStatusMessage(`${t("status_moved_to_trash")}: ${deletedName}`);
                 diskAnalyzerSelectedItem = null;
                 btnDiskAnalyzerDelete.disabled = true;
                 if (diskAnalyzerFooterInfo) diskAnalyzerFooterInfo.textContent = "Ningún elemento seleccionado";
                 runDiskAnalyzerScan();
             } else {
-                const err = await res.json();
-                alert(`Error al eliminar: ${err.error}`);
+                const err = await res.json().catch(() => ({}));
+                alert(`Error al eliminar: ${err.error || res.status}`);
             }
         } catch (e) {
             alert(`Error de red al eliminar: ${e}`);

@@ -5,11 +5,49 @@ lanzadores autostart y archivos del sistema.
 """
 
 import os
-import sys
+import signal
 import subprocess
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+
+# Lineas de comando que identifican de verdad al servidor de Martix. Antes se
+# usaba `pkill -f martix`, que casa con CUALQUIER proceso cuya linea de
+# comandos contenga "martix" -- incluido el propio desinstalador, que se
+# ejecuta como `python3 /ruta/a/martix/uninstaller.py`. El desinstalador se
+# mataba a si mismo en este punto y nunca llegaba a borrar los accesos
+# directos, el autostart ni el servicio. Tambien mataba editores o terminales
+# que tuvieran el proyecto abierto.
+_SERVER_MARKERS = (
+    str(PROJECT_ROOT / "backend" / "main.py"),
+    str(PROJECT_ROOT / "backend" / "desktop.py"),
+)
+
+
+def _stop_martix_processes() -> None:
+    """Detiene solo los procesos del servidor de Martix, nunca a si mismo."""
+    own_pid = os.getpid()
+    for marker in _SERVER_MARKERS:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", marker], capture_output=True, text=True, check=False
+            )
+        except FileNotFoundError:
+            print("  - 'pgrep' no disponible; omitiendo parada de procesos")
+            return
+        for line in result.stdout.split():
+            try:
+                pid = int(line)
+            except ValueError:
+                continue
+            if pid == own_pid or pid == os.getppid():
+                continue
+            try:
+                os.kill(pid, signal.SIGTERM)
+                print(f"  - Detenido proceso {pid} ({Path(marker).name})")
+            except OSError as exc:
+                print(f"  - No se pudo detener el proceso {pid}: {exc}")
 
 
 def uninstall_martix():
@@ -31,10 +69,7 @@ def uninstall_martix():
         except Exception:
             pass
 
-        try:
-            subprocess.run(["pkill", "-f", "martix"], check=False)
-        except Exception:
-            pass
+        _stop_martix_processes()
 
         print("==> Eliminando archivos de integración del sistema...")
         for f in (desktop_app, autostart_app, service_file, cli_bin):

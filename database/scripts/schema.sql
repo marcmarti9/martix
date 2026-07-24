@@ -1,15 +1,20 @@
 -- Esquema SQLite de Martix
 
+-- Varias reglas pueden compartir extension: es justo el sentido de las
+-- condiciones ("pdf que contiene factura" vs "pdf que contiene contrato").
+-- El indice es NO unico a proposito; 'priority' fija en que orden se evaluan
+-- (menor = se comprueba antes).
 CREATE TABLE IF NOT EXISTS rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     extension TEXT NOT NULL,       -- sin punto, minusculas, ej. "pdf"
     destination TEXT NOT NULL,     -- ruta relativa a la carpeta personal, ej. "Documents/Facturas"
     rename_pattern TEXT,
     conditions TEXT,
+    priority INTEGER NOT NULL DEFAULT 100,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_rules_extension ON rules(extension);
+CREATE INDEX IF NOT EXISTS idx_rules_extension ON rules(extension);
 
 CREATE TABLE IF NOT EXISTS moves_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,8 +23,13 @@ CREATE TABLE IF NOT EXISTS moves_log (
     destination TEXT NOT NULL,
     category TEXT NOT NULL,
     moved_at TEXT NOT NULL DEFAULT (datetime('now')),
-    undone_at TEXT                 -- fecha en que se deshizo el movimiento, si se deshizo
+    undone_at TEXT,                -- fecha en que se deshizo el movimiento, si se deshizo
+    -- 0 para eventos que no se pueden revertir (un desempaquetado, un borrado
+    -- por mantenimiento): la interfaz no debe ofrecer "Deshacer" ahi.
+    undoable INTEGER NOT NULL DEFAULT 1
 );
+
+CREATE INDEX IF NOT EXISTS idx_moves_log_moved_at ON moves_log(moved_at);
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,

@@ -4,13 +4,20 @@ gestionar reglas/Temas y deshacer movimientos del historial."""
 
 import atexit
 import logging
+import os
 from pathlib import Path
 from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from app import browser, db, llm, security
-from app.organizer import find_duplicates, organize_directory, resolve_destination_folder, undo_move
+from app import browser, db, llm, security, trash
+from app.organizer import (
+    find_duplicates,
+    invalidate_scan_dirs_cache,
+    organize_directory,
+    resolve_destination_folder,
+    undo_move,
+)
 from app.scheduler import scheduler
 from app.watcher import PatrolManager
 from config import settings as llm_settings
@@ -32,117 +39,37 @@ atexit.register(scheduler.stop)
 
 
 
-def _get_scan_dirs():
-    dirs = set()
-    dirs.add(DOWNLOADS_DIR.resolve())
-    try:
-        from config.settings import load_categories
-        categories = load_categories()["categories"]
-        for cat in categories.values():
-            folder_str = cat.get("folder")
-            if folder_str:
-                from app.security import safe_destination_dir
-                resolved = safe_destination_dir(folder_str)
-                if resolved and resolved.exists():
-                    dirs.add(resolved.resolve())
-    except Exception:
-        pass
-    try:
-        for topic in db.list_topics():
-            folder_str = topic.get("destination")
-            if folder_str:
-                from app.security import safe_destination_dir
-                resolved = safe_destination_dir(folder_str)
-                if resolved and resolved.exists():
-                    dirs.add(resolved.resolve())
-    except Exception:
-        pass
-    return list(dirs)
+# Tope de cuerpo de peticion: sin el, un POST de reglas o de rutas puede
+# agotar la memoria del proceso.
+MAX_REQUEST_BYTES = 2 * 1024 * 1024
 
 
-def _find_all_files(scan_dirs):
-    import os
-    from config.settings import IGNORED_SUFFIXES
-    files = []
-    seen_paths = set()
-    for root_dir in scan_dirs:
-        if not root_dir.exists() or not root_dir.is_dir():
-            continue
-        for root, dirs, filenames in os.walk(root_dir):
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
-            for f in filenames:
-                if f.startswith('.'):
-                    continue
-                if Path(f).suffix.lower() in IGNORED_SUFFIXES:
-                    continue
-                file_path = Path(root) / f
-                try:
-                    resolved = file_path.resolve()
-                    if resolved not in seen_paths and resolved.is_file():
-                        seen_paths.add(resolved)
-                        files.append(resolved)
-                except OSError:
-                    continue
-    return files
+def _safe_delete_target(raw_path) -> tuple[Path | None, tuple[dict, int] | None]:
+    """Resuelve una ruta recibida de la interfaz para BORRARLA.
 
+    Todo borrado pasa por aqui: valida que la ruta sea una cadena, que caiga
+    dentro de la carpeta personal y que no sea una ruta protegida (~/.ssh,
+    ~/.config, la propia base de datos de Martix...). Devuelve (ruta, error).
+    """
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return None, ({"error": "ruta invalida"}, 400)
 
-def _scan_duplicates(files):
-    from datetime import datetime
-    from app.organizer import calculate_sha256
-    from config.settings import HOME_DIR
-    by_size = {}
-    for path in files:
-        try:
-            size = path.stat().st_size
-            by_size.setdefault(size, []).append(path)
-        except OSError:
-            continue
-            
-    duplicate_groups = {}
-    for size, paths in by_size.items():
-        if size == 0:
-            continue
-        if len(paths) < 2:
-            continue
-        for path in paths:
-            sha = calculate_sha256(path)
-            if sha:
-                try:
-                    rel_path = str(path.relative_to(HOME_DIR.resolve())).replace("\\", "/")
-                except ValueError:
-                    rel_path = str(path).replace("\\", "/")
-                
-                try:
-                    stat = path.stat()
-                    mtime_str = datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds")
-                except OSError:
-                    mtime_str = ""
+    resolved = browser.resolve_safe_path(raw_path)
+    if resolved is None:
+        return None, ({"error": f"ruta no permitida: {raw_path}"}, 400)
 
-                entry = {
-                    "path": rel_path,
-                    "name": path.name,
-                    "mtime": mtime_str
-                }
-                duplicate_groups.setdefault(sha, {
-                    "hash": sha,
-                    "size_bytes": size,
-                    "files": []
-                })["files"].append(entry)
+    if security.is_protected_path(resolved):
+        logger.warning("intento de borrado sobre ruta protegida: %s", resolved)
+        return None, ({
+            "error": f"ruta protegida, Martix no la borrara: {raw_path}"
+        }, 403)
 
-    result = [
-        g for g in duplicate_groups.values()
-        if len(g["files"]) >= 2
-    ]
-    
-    for g in result:
-        g["files"].sort(key=lambda x: x["path"])
-        
-    result.sort(key=lambda g: g["size_bytes"], reverse=True)
-    return result
+    return resolved, None
 
 
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
+    app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
 
     @app.before_request
     def guard_request():
@@ -206,10 +133,11 @@ def create_app() -> Flask:
         """Dry-run: classify every file in DOWNLOADS_DIR without moving."""
         results = []
         if DOWNLOADS_DIR.exists():
+            rules = db.list_rules()  # una sola lectura para todo el listado
             for entry in sorted(DOWNLOADS_DIR.iterdir()):
                 if not entry.is_file() or entry.suffix.lower() in IGNORED_SUFFIXES:
                     continue
-                category, relative_folder, _rename = resolve_destination_folder(entry)
+                category, relative_folder, _rename = resolve_destination_folder(entry, rules=rules)
                 dest_dir = security.safe_destination_dir(relative_folder)
                 results.append({
                     "filename": entry.name,
@@ -254,8 +182,60 @@ def create_app() -> Flask:
             return jsonify({"error": "carpeta destino invalida: debe ser relativa a tu carpeta personal, ej. Documents/Facturas"}), 400
         if conditions_raw and conditions is None:
             return jsonify({"error": "condiciones invalidas: campo u operador no reconocido"}), 400
+        # Varias reglas pueden compartir extension: es lo que permite encadenar
+        # condiciones distintas sobre el mismo tipo de archivo.
         rule = db.add_rule(extension, destination, rename_pattern, conditions)
         return jsonify(rule), 201
+
+    @app.patch("/api/rules/<int:rule_id>")
+    @app.put("/api/rules/<int:rule_id>")
+    def edit_rule(rule_id: int):
+        if db.get_rule(rule_id) is None:
+            return jsonify({"error": "regla no encontrada"}), 404
+        payload = request.get_json(silent=True) or {}
+        updates = {}
+
+        if "extension" in payload:
+            extension = security.valid_extension(payload.get("extension") or "")
+            if extension is None:
+                return jsonify({"error": "extension invalida"}), 400
+            updates["extension"] = extension
+        if "destination" in payload:
+            destination = security.clean_destination(payload.get("destination") or "")
+            if destination is None:
+                return jsonify({"error": "carpeta destino invalida"}), 400
+            updates["destination"] = destination
+        if "rename_pattern" in payload:
+            updates["rename_pattern"] = (payload.get("rename_pattern") or "").strip() or None
+        if "conditions" in payload:
+            conditions_raw = payload.get("conditions")
+            conditions = security.valid_conditions(conditions_raw) if conditions_raw else None
+            if conditions_raw and conditions is None:
+                return jsonify({"error": "condiciones invalidas"}), 400
+            updates["conditions"] = conditions
+        if "priority" in payload:
+            try:
+                updates["priority"] = max(1, min(int(payload["priority"]), 100000))
+            except (TypeError, ValueError):
+                return jsonify({"error": "priority debe ser un entero"}), 400
+
+        return jsonify(db.update_rule(rule_id, **updates))
+
+    @app.post("/api/rules/reorder")
+    def reorder_rules():
+        """Reordena las reglas: el orden decide cual gana cuando varias casan."""
+        payload = request.get_json(silent=True) or {}
+        raw_ids = payload.get("ids")
+        if not isinstance(raw_ids, list) or not raw_ids:
+            return jsonify({"error": "ids debe ser una lista de identificadores de regla"}), 400
+        try:
+            ids = [int(i) for i in raw_ids]
+        except (TypeError, ValueError):
+            return jsonify({"error": "ids debe contener solo numeros"}), 400
+        known = {r["id"] for r in db.list_rules()}
+        if not set(ids).issubset(known):
+            return jsonify({"error": "alguna regla del listado no existe"}), 400
+        return jsonify(db.reorder_rules(ids))
 
     @app.delete("/api/rules/<int:rule_id>")
     def remove_rule(rule_id: int):
@@ -387,11 +367,13 @@ def create_app() -> Flask:
             return jsonify({"error": "Ruta de destino no permitida o insegura"}), 400
 
         topic = db.add_topic(name, destination, keywords, rename_pattern)
+        invalidate_scan_dirs_cache()
         return jsonify(topic), 201
 
     @app.delete("/api/topics/<int:topic_id>")
     def remove_topic(topic_id: int):
         db.delete_topic(topic_id)
+        invalidate_scan_dirs_cache()
         return "", 204
 
     @app.get("/api/tree")
@@ -414,12 +396,18 @@ def create_app() -> Flask:
             "entries": browser.list_directory(resolved),
         })
 
-    @app.get("/api/settings")
-    def get_settings():
-        return jsonify({
+    def _settings_payload():
+        return {
             "duplicate_action": db.get_setting("duplicate_action", "suffix"),
             "onboarded": db.get_setting("onboarded", "0") == "1",
-        })
+            "unpack_archives": str(db.get_setting("unpack_archives", "true")).lower() in ("true", "1"),
+            "watch_recursive": db.get_setting("watch_recursive", "0") == "1",
+            "native_trash": trash.native_trash_available(),
+        }
+
+    @app.get("/api/settings")
+    def get_settings():
+        return jsonify(_settings_payload())
 
     @app.post("/api/settings")
     def update_settings():
@@ -429,12 +417,14 @@ def create_app() -> Flask:
             if action in ("suffix", "skip", "delete_source"):
                 db.set_setting("duplicate_action", action)
         if "onboarded" in payload:
-            onboarded_val = "1" if payload["onboarded"] else "0"
-            db.set_setting("onboarded", onboarded_val)
-        return jsonify({
-            "duplicate_action": db.get_setting("duplicate_action", "suffix"),
-            "onboarded": db.get_setting("onboarded", "0") == "1",
-        })
+            db.set_setting("onboarded", "1" if payload["onboarded"] else "0")
+        if "unpack_archives" in payload:
+            db.set_setting("unpack_archives", "true" if payload["unpack_archives"] else "false")
+        if "watch_recursive" in payload:
+            db.set_setting("watch_recursive", "1" if payload["watch_recursive"] else "0")
+            # Reprogramar las vigilancias para que el cambio surta efecto ya.
+            patrol.update_watched_folders()
+        return jsonify(_settings_payload())
 
     @app.get("/api/llm/status")
     def get_llm_status():
@@ -481,12 +471,14 @@ def create_app() -> Flask:
         if resolved is None:
             return jsonify({"error": "ruta no permitida o insegura"}), 400
         result = db.add_watched_folder(str(resolved))
+        invalidate_scan_dirs_cache()
         patrol.update_watched_folders()
         return jsonify(result), 201
 
     @app.delete("/api/watched-folders/<int:folder_id>")
     def remove_watched_folder(folder_id: int):
         db.delete_watched_folder(folder_id)
+        invalidate_scan_dirs_cache()
         patrol.update_watched_folders()
         return "", 204
 
@@ -569,27 +561,58 @@ def create_app() -> Flask:
         else:
             files_to_delete = []
 
+        if not isinstance(files_to_delete, list):
+            return jsonify({"error": "se esperaba una lista de rutas"}), 400
+        if len(files_to_delete) > 5000:
+            return jsonify({"error": "demasiados archivos en una sola peticion"}), 400
+
         resolved_paths = []
         for f_path in files_to_delete:
-            resolved = browser.resolve_safe_path(f_path)
-            if resolved is None:
-                return jsonify({"error": f"ruta no permitida: {f_path}"}), 400
-            
+            resolved, error = _safe_delete_target(f_path)
+            if error:
+                return jsonify(error[0]), error[1]
             if resolved.exists():
-                if not resolved.is_file():
+                if not resolved.is_file() or resolved.is_symlink():
                     return jsonify({"error": f"la ruta no es un archivo: {f_path}"}), 400
                 resolved_paths.append(resolved)
 
-        deleted_count = 0
+        deleted, failed = [], []
         for resolved_path in resolved_paths:
             try:
-                resolved_path.unlink()
-                deleted_count += 1
-            except OSError as e:
-                logger.exception("Error unlinking file %s", resolved_path)
-                return jsonify({"error": f"no se pudo eliminar: {resolved_path.name}"}), 500
-        
-        return jsonify({"success": True, "deleted": deleted_count})
+                # A la papelera: "es un duplicado" es una conclusion del hash,
+                # y si el usuario se equivoca de casilla tiene que poder
+                # recuperarlo.
+                trash.move_to_trash(resolved_path)
+                deleted.append(str(resolved_path))
+            except OSError:
+                logger.exception("no se pudo enviar a la papelera %s", resolved_path)
+                failed.append(resolved_path.name)
+
+        return jsonify({
+            "success": not failed,
+            "deleted": len(deleted),
+            "failed": failed,
+            "trashed": True,
+        })
+
+    @app.get("/api/trash")
+    def get_trash():
+        return jsonify({
+            "native": trash.native_trash_available(),
+            "items": trash.list_trash(),
+        })
+
+    @app.post("/api/trash/<entry_id>/restore")
+    def restore_from_trash(entry_id: str):
+        entry, error = trash.restore(entry_id)
+        if error:
+            return jsonify({"error": error}), 409
+        return jsonify(entry)
+
+    @app.delete("/api/trash/<entry_id>")
+    def purge_trash_entry(entry_id: str):
+        removed = trash.purge(entry_id=entry_id)
+        return jsonify({"success": True, "purged": removed})
 
     @app.get("/api/maintenance/rules")
     @app.get("/api/maintenance")
@@ -663,37 +686,46 @@ def create_app() -> Flask:
             logger.exception("Error escaneando disco: %s", e)
             return jsonify({"error": f"Error al escanear disco: {e}"}), 500
 
+    # Borrar una carpeta desde el analizador de espacio se lleva por delante
+    # todo su contenido: exige confirmacion explicita a partir de este numero
+    # de archivos, para que un clic accidental (o un script inyectado) no pueda
+    # vaciar una carpeta entera de golpe.
+    CONFIRM_REQUIRED_ABOVE = 25
+
     @app.post("/api/disk/delete")
     def delete_disk_item():
         payload = request.get_json(silent=True) or {}
-        raw_path = payload.get("path")
-        if not raw_path:
-            return jsonify({"error": "Ruta obligatoria"}), 400
-        resolved = browser.resolve_safe_path(raw_path)
-        if resolved is None or not resolved.exists():
-            return jsonify({"error": "Ruta invalida o no permitida"}), 400
+        resolved, error = _safe_delete_target(payload.get("path"))
+        if error:
+            return jsonify(error[0]), error[1]
+        if not resolved.exists():
+            return jsonify({"error": "la ruta ya no existe"}), 404
+        if resolved.is_symlink():
+            return jsonify({"error": "no se borran enlaces simbolicos"}), 400
+
+        if resolved.is_dir():
+            file_count = sum(len(files) for _root, _dirs, files in os.walk(resolved))
+            if file_count > CONFIRM_REQUIRED_ABOVE and not payload.get("confirm"):
+                return jsonify({
+                    "error": "confirmacion requerida",
+                    "needs_confirmation": True,
+                    "file_count": file_count,
+                    "path": payload.get("path"),
+                }), 409
+
         try:
-            if resolved.is_file():
-                resolved.unlink()
-            elif resolved.is_dir():
-                import shutil
-                shutil.rmtree(resolved)
-            return jsonify({"success": True, "deleted": str(raw_path)})
-        except Exception as e:
-            logger.exception("Error al eliminar elemento del disco: %s", e)
-            return jsonify({"error": f"No se pudo eliminar: {e}"}), 500
+            outcome = trash.move_to_trash(resolved)
+        except OSError as exc:
+            logger.exception("Error al enviar a la papelera un elemento del disco")
+            return jsonify({"error": f"No se pudo eliminar: {exc}"}), 500
 
-
-    # Ejecucion del mantenimiento al iniciar el servidor
-    import threading
-    def start_background_maintenance():
-        try:
-            from app.organizer import run_maintenance_cleanup
-            run_maintenance_cleanup()
-        except Exception as e:
-            logger.exception("Error en la ejecucion de mantenimiento al inicio: %s", e)
-
-    threading.Thread(target=start_background_maintenance, daemon=True).start()
+        return jsonify({
+            "success": True,
+            "deleted": str(payload.get("path")),
+            "trashed": True,
+            "trash_method": outcome["method"],
+            "trash_id": outcome["entry_id"],
+        })
 
     return app
 

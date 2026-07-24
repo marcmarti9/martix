@@ -2,6 +2,7 @@
 y ajustes persistentes (p.ej. si la Patrulla Activa estaba encendida)."""
 
 import sqlite3
+import threading
 from contextlib import contextmanager
 
 from config.settings import DB_PATH, SCHEMA_PATH
@@ -9,37 +10,120 @@ from config.settings import DB_PATH, SCHEMA_PATH
 
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with get_conn() as conn:
+    with get_conn():
         pass  # get_conn ya garantiza el esquema
 
 
+# Validar el esquema en CADA conexion costaba 6 sentencias extra por operacion
+# (2 SELECT sobre sqlite_master + 4 PRAGMA table_info), y organize_file abre
+# ~6 conexiones por archivo. Se valida una vez por proceso y se repite solo si
+# alguien borra o vacia la base de datos con el servidor en marcha.
+_schema_lock = threading.Lock()
+_schema_checked_for: str | None = None
+
+
+def _invalidate_schema_cache() -> None:
+    global _schema_checked_for
+    with _schema_lock:
+        _schema_checked_for = None
+
+
 def _ensure_schema(conn: sqlite3.Connection) -> None:
-    """Crea las tablas si faltan. Se comprueba en cada conexion (un SELECT
-    trivial) para sobrevivir a que alguien borre o vacie martix.db con el
-    servidor en marcha: la siguiente peticion lo regenera en vez de dar 500."""
-    required = {"rules", "moves_log", "settings", "topics", "maintenance_rules", "watched_folders"}
-    existing = {
-        row["name"]
-        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
-    }
-    if not required.issubset(existing):
-        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-    _migrate(conn)
+    """Crea las tablas si faltan y aplica las migraciones pendientes."""
+    global _schema_checked_for
+    with _schema_lock:
+        if _schema_checked_for == str(DB_PATH):
+            return
+
+        # WAL es una propiedad persistente del fichero: basta fijarla una vez,
+        # no en cada conexion (ademas es una escritura).
+        conn.execute("PRAGMA journal_mode = WAL")
+
+        required = {"rules", "moves_log", "settings", "topics",
+                    "maintenance_rules", "watched_folders"}
+        existing = {
+            row["name"]
+            for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        if not required.issubset(existing):
+            conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        _migrate(conn)
+        conn.commit()
+        _schema_checked_for = str(DB_PATH)
+
+
+def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _migrate_rules_table(conn: sqlite3.Connection) -> None:
+    """Elimina el UNIQUE(extension) heredado y anade 'priority'.
+
+    El indice unico impedia tener mas de una regla por extension, lo que
+    dejaba sin sentido toda la funcion de condiciones: crear una segunda regla
+    .pdf sobrescribia la primera en silencio.
+    """
+    cols = _table_columns(conn, "rules")
+    if not cols:
+        return
+
+    if "priority" not in cols:
+        conn.execute("ALTER TABLE rules ADD COLUMN priority INTEGER NOT NULL DEFAULT 100")
+
+    has_unique = any(row["unique"] for row in conn.execute("PRAGMA index_list(rules)"))
+    if not has_unique:
+        return
+
+    conn.execute("DROP INDEX IF EXISTS idx_rules_extension")
+    if not any(row["unique"] for row in conn.execute("PRAGMA index_list(rules)")):
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_rules_extension ON rules(extension)")
+        return
+
+    # El indice unico venia de una restriccion de columna: hay que rehacer la
+    # tabla conservando las reglas existentes.
+    conn.execute("ALTER TABLE rules RENAME TO _rules_old")
+    conn.execute("""
+        CREATE TABLE rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            extension TEXT NOT NULL,
+            destination TEXT NOT NULL,
+            rename_pattern TEXT,
+            conditions TEXT,
+            priority INTEGER NOT NULL DEFAULT 100,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        INSERT INTO rules (extension, destination, rename_pattern, conditions, priority, created_at)
+        SELECT extension, destination, rename_pattern, conditions,
+               COALESCE(priority, 100), COALESCE(created_at, datetime('now'))
+        FROM _rules_old
+    """)
+    conn.execute("DROP TABLE _rules_old")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rules_extension ON rules(extension)")
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Migraciones para bases de datos creadas con esquemas anteriores."""
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(moves_log)")}
-    if "undone_at" not in columns:
+    moves_cols = _table_columns(conn, "moves_log")
+    if "undone_at" not in moves_cols:
         conn.execute("ALTER TABLE moves_log ADD COLUMN undone_at TEXT")
+    if "undoable" not in moves_cols:
+        conn.execute("ALTER TABLE moves_log ADD COLUMN undoable INTEGER NOT NULL DEFAULT 1")
+        # Las filas antiguas de estas categorias nunca fueron reversibles.
+        conn.execute(
+            "UPDATE moves_log SET undoable = 0 "
+            "WHERE category IN ('mantenimiento', 'desempaquetado') OR destination = 'DELETED'"
+        )
 
-    rules_cols = {row["name"] for row in conn.execute("PRAGMA table_info(rules)")}
+    rules_cols = _table_columns(conn, "rules")
     if "rename_pattern" not in rules_cols:
         conn.execute("ALTER TABLE rules ADD COLUMN rename_pattern TEXT")
     if "conditions" not in rules_cols:
         conn.execute("ALTER TABLE rules ADD COLUMN conditions TEXT")
+    _migrate_rules_table(conn)
 
-    topics_cols = {row["name"] for row in conn.execute("PRAGMA table_info(topics)")}
+    topics_cols = _table_columns(conn, "topics")
     if "rename_pattern" not in topics_cols:
         conn.execute("ALTER TABLE topics ADD COLUMN rename_pattern TEXT")
 
@@ -48,19 +132,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
         for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
     }
     if "maintenance_rules" in existing_tables:
-        m_cols = {row["name"] for row in conn.execute("PRAGMA table_info(maintenance_rules)")}
+        m_cols = _table_columns(conn, "maintenance_rules")
         if "folder" not in m_cols:
             conn.execute("DROP TABLE maintenance_rules")
-            conn.execute("""
-                CREATE TABLE maintenance_rules (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    folder TEXT NOT NULL UNIQUE,
-                    max_age_days INTEGER NOT NULL,
-                    active INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-                )
-            """)
-    else:
+            existing_tables.discard("maintenance_rules")
+    if "maintenance_rules" not in existing_tables:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS maintenance_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,18 +158,27 @@ def _migrate(conn: sqlite3.Connection) -> None:
         """)
 
 
-
 @contextmanager
 def get_conn():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA busy_timeout = 5000")
     try:
-        _ensure_schema(conn)
+        try:
+            _ensure_schema(conn)
+        except sqlite3.Error:
+            # La BD pudo ser borrada o corrompida en caliente: se reintenta una
+            # vez desde cero antes de propagar el fallo.
+            _invalidate_schema_cache()
+            _ensure_schema(conn)
         yield conn
         conn.commit()
+    except sqlite3.DatabaseError:
+        conn.rollback()
+        _invalidate_schema_cache()
+        raise
     except Exception:
         conn.rollback()
         raise
@@ -103,31 +188,84 @@ def get_conn():
 
 # ---- reglas personalizadas -------------------------------------------------
 
+# Orden de evaluacion de reglas. organizer.resolve_destination_folder aplica la
+# PRIMERA que casa, asi que el orden es la semantica:
+#   1. priority (la fija el usuario; menor = antes)
+#   2. reglas de extension concreta antes que las comodin ("*"): por orden
+#      ASCII "*" (42) iria primero y silenciaria toda regla especifica
+#   3. reglas CON condiciones antes que las que no las tienen: son mas
+#      especificas, y si no una regla ".pdf -> Documentos" sin condiciones
+#      dejaria muerta a ".pdf que contiene factura -> Facturas"
+#   4. id, para que el orden sea estable y reproducible
+_RULES_ORDER = (
+    "ORDER BY priority ASC, "
+    "(extension = '*') ASC, "
+    "(conditions IS NULL OR conditions = '') ASC, "
+    "id ASC"
+)
+
+
 def list_rules() -> list[dict]:
-    # organizer.resolve_destination_folder toma la primera regla que
-    # coincide, asi que las reglas comodin ("*") deben ir siempre despues de
-    # las de extension concreta: por orden ASCII normal "*" (42) ordena antes
-    # que cualquier letra o digito y silenciaria toda regla especifica.
     with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM rules ORDER BY (extension = '*'), extension"
-        ).fetchall()
+        rows = conn.execute(f"SELECT * FROM rules {_RULES_ORDER}").fetchall()
         return [dict(r) for r in rows]
 
 
-def add_rule(extension: str, destination: str, rename_pattern: str | None = None, conditions: str | None = None) -> dict:
+def get_rule(rule_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def add_rule(extension: str, destination: str, rename_pattern: str | None = None,
+             conditions: str | None = None, priority: int | None = None) -> dict:
+    """Crea una regla nueva. Varias reglas pueden compartir extension: es lo que
+    permite encadenar condiciones distintas sobre el mismo tipo de archivo."""
     extension = extension.lower().lstrip(".").strip()
     destination = destination.strip().strip("/")
     with get_conn() as conn:
-        conn.execute(
-            """INSERT INTO rules (extension, destination, rename_pattern, conditions) VALUES (?, ?, ?, ?)
-               ON CONFLICT(extension) DO UPDATE SET destination = excluded.destination,
-                                                    rename_pattern = excluded.rename_pattern,
-                                                    conditions = excluded.conditions""",
-            (extension, destination, rename_pattern, conditions),
+        if priority is None:
+            row = conn.execute("SELECT COALESCE(MAX(priority), 99) + 1 AS p FROM rules").fetchone()
+            priority = row["p"]
+        cur = conn.execute(
+            """INSERT INTO rules (extension, destination, rename_pattern, conditions, priority)
+               VALUES (?, ?, ?, ?, ?)""",
+            (extension, destination, rename_pattern, conditions, int(priority)),
         )
-        row = conn.execute("SELECT * FROM rules WHERE extension = ?", (extension,)).fetchone()
+        row = conn.execute("SELECT * FROM rules WHERE id = ?", (cur.lastrowid,)).fetchone()
         return dict(row)
+
+
+def update_rule(rule_id: int, **fields) -> dict | None:
+    """Actualiza campos concretos de una regla existente."""
+    allowed = {"extension", "destination", "rename_pattern", "conditions", "priority"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return get_rule(rule_id)
+    if "extension" in updates:
+        updates["extension"] = str(updates["extension"]).lower().lstrip(".").strip()
+    if "destination" in updates:
+        updates["destination"] = str(updates["destination"]).strip().strip("/")
+    if "priority" in updates:
+        updates["priority"] = int(updates["priority"])
+
+    assignments = ", ".join(f"{k} = ?" for k in updates)
+    with get_conn() as conn:
+        conn.execute(
+            f"UPDATE rules SET {assignments} WHERE id = ?",
+            (*updates.values(), rule_id),
+        )
+        row = conn.execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def reorder_rules(ordered_ids: list[int]) -> list[dict]:
+    """Reasigna prioridades segun el orden recibido desde la interfaz."""
+    with get_conn() as conn:
+        for position, rule_id in enumerate(ordered_ids, start=1):
+            conn.execute("UPDATE rules SET priority = ? WHERE id = ?", (position, int(rule_id)))
+        rows = conn.execute(f"SELECT * FROM rules {_RULES_ORDER}").fetchall()
+        return [dict(r) for r in rows]
 
 
 def delete_rule(rule_id: int) -> None:
@@ -136,21 +274,35 @@ def delete_rule(rule_id: int) -> None:
 
 
 def get_rule_for_extension(extension: str) -> dict | None:
+    """Primera regla (por orden de evaluacion) de una extension concreta.
+    Ahora puede haber varias; usa list_rules_for_extension si las quieres todas."""
+    rules = list_rules_for_extension(extension)
+    return rules[0] if rules else None
+
+
+def list_rules_for_extension(extension: str) -> list[dict]:
     with get_conn() as conn:
-        row = conn.execute(
-            "SELECT * FROM rules WHERE extension = ?", (extension.lower().lstrip("."),)
-        ).fetchone()
-        return dict(row) if row else None
+        rows = conn.execute(
+            f"SELECT * FROM rules WHERE extension = ? {_RULES_ORDER}",
+            (extension.lower().lstrip("."),),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 # ---- log de movimientos / estadisticas -------------------------------------
 
-def log_move(filename: str, source: str, destination: str, category: str) -> None:
+def log_move(filename: str, source: str, destination: str, category: str,
+             undoable: bool = True) -> int:
+    """Registra un movimiento. 'undoable=False' para eventos que no se pueden
+    revertir (desempaquetados, borrados de mantenimiento): la interfaz no debe
+    ofrecer un boton Deshacer que siempre va a fallar."""
     with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO moves_log (filename, source, destination, category) VALUES (?, ?, ?, ?)",
-            (filename, source, destination, category),
+        cur = conn.execute(
+            "INSERT INTO moves_log (filename, source, destination, category, undoable) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (filename, source, destination, category, 1 if undoable else 0),
         )
+        return cur.lastrowid
 
 
 def count_moves() -> int:
@@ -159,13 +311,19 @@ def count_moves() -> int:
         return row["c"]
 
 
+def _move_row_to_dict(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["undoable"] = bool(d.get("undoable", 1)) and not d.get("undone_at")
+    return d
+
+
 def recent_moves(limit: int = 20) -> list[dict]:
     limit = max(1, min(limit, 500))
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM moves_log ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_move_row_to_dict(r) for r in rows]
 
 
 def get_move(move_id: int) -> dict | None:

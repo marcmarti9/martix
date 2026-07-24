@@ -139,15 +139,33 @@ def get_available_drives() -> List[Dict[str, str]]:
     return drives
 
 
-def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
+# Limites del escaneo. Sin ellos, analizar "~" recorria el arbol entero de
+# forma recursiva dentro de la peticion HTTP: minutos de bloqueo y riesgo de
+# RecursionError (el limite de Python son ~1000 marcos) en arboles anidados.
+MAX_SCAN_DEPTH = 40          # profundidad real de recursion
+DEFAULT_TIME_BUDGET = 90.0   # segundos antes de devolver un resultado parcial
+MAX_TREEMAP_CANDIDATES = 20_000
+
+
+def scan_disk_usage(root_path: Path, max_depth: int = 6,
+                    time_budget: float = DEFAULT_TIME_BUDGET) -> Dict[str, Any]:
     """Escanea recursivamente root_path produciendo arbol de carpetas estilo WizTree,
     estadisticas de uso, desglose de extensiones y lista para Treemap visual.
+
+    'max_depth' controla hasta que nivel se CONSTRUYE el arbol para la interfaz;
+    los tamanos se siguen sumando mas abajo, pero con un acumulador iterativo
+    que no gasta pila ni memoria. 'time_budget' acota el tiempo total: si se
+    agota, se devuelve lo obtenido con truncated=True.
     """
     start_time = time.perf_counter()
+    deadline = start_time + max(1.0, time_budget)
+    truncated = False
 
     root_resolved = root_path.resolve()
     if not root_resolved.exists():
         raise ValueError(f"La ruta no existe: {root_path}")
+    if not root_resolved.is_dir():
+        raise ValueError(f"La ruta no es una carpeta: {root_path}")
 
     # Informacion global del disco
     total_space, used_space, free_space = 0, 0, 0
@@ -162,10 +180,60 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
     extension_map: Dict[str, Dict[str, Any]] = {}
     treemap_items: List[Dict[str, Any]] = []
 
+    def _aggregate_subtree(start: Path) -> tuple[int, int, int, float]:
+        """Suma tamanos por debajo de max_depth sin construir nodos ni recursion.
+
+        Devuelve (bytes, archivos, carpetas, mtime_mas_reciente). Tambien
+        alimenta el desglose por extensiones para que las estadisticas globales
+        sigan siendo exactas.
+        """
+        nonlocal truncated
+        total_size = files = folders = 0
+        latest = 0.0
+        stack = [start]
+        while stack:
+            if time.perf_counter() > deadline:
+                truncated = True
+                break
+            current = stack.pop()
+            try:
+                entries = list(os.scandir(current))
+            except OSError:
+                continue
+            for entry in entries:
+                try:
+                    st = entry.stat(follow_symlinks=False)
+                except OSError:
+                    continue
+                if st.st_mtime > latest:
+                    latest = st.st_mtime
+                if entry.is_dir(follow_symlinks=False):
+                    folders += 1
+                    stack.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    files += 1
+                    total_size += st.st_size
+                    _record_extension(entry.name, st.st_size)
+        return total_size, files, folders, latest
+
+    def _record_extension(name: str, size: int) -> None:
+        ext = Path(name).suffix.lower().lstrip(".")
+        ext_key = f".{ext}" if ext else "(Sin extensión)"
+        bucket = extension_map.get(ext_key)
+        if bucket is None:
+            type_name, color = get_extension_info(ext)
+            bucket = extension_map[ext_key] = {
+                "extension": ext_key, "type_name": type_name,
+                "color": color, "size": 0, "count": 0,
+            }
+        bucket["size"] += size
+        bucket["count"] += 1
+
     def _scan_node(current_path: Path, current_depth: int) -> Dict[str, Any]:
+        nonlocal truncated
         node_name = current_path.name or str(current_path)
         path_key = _path_to_key(current_path)
-        
+
         node_size = 0
         files_count = 0
         folders_count = 0
@@ -180,6 +248,9 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
             entries = []
 
         for entry in entries:
+            if time.perf_counter() > deadline:
+                truncated = True
+                break
             try:
                 stat = entry.stat(follow_symlinks=False)
                 mtime = stat.st_mtime
@@ -191,17 +262,26 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
             if entry.is_dir(follow_symlinks=False):
                 folders_count += 1
                 child_path = Path(entry.path)
+
+                # Por debajo del nivel que la interfaz muestra, o si el arbol es
+                # patologicamente profundo, se pasa al acumulador iterativo.
+                if current_depth >= max_depth or current_depth >= MAX_SCAN_DEPTH:
+                    sub_size, sub_files, sub_folders, sub_mtime = _aggregate_subtree(child_path)
+                    node_size += sub_size
+                    files_count += sub_files
+                    folders_count += sub_folders
+                    latest_mtime = max(latest_mtime, sub_mtime)
+                    continue
+
                 child_node = _scan_node(child_path, current_depth + 1)
-                
+
                 node_size += child_node["size"]
                 files_count += child_node["files_count"]
                 folders_count += child_node["folders_count"]
                 if child_node["mtime_timestamp"] > latest_mtime:
                     latest_mtime = child_node["mtime_timestamp"]
-                
-                # Guardar solo subhijos si no excedemos max_depth
-                if current_depth < max_depth:
-                    children.append(child_node)
+
+                children.append(child_node)
             elif entry.is_file(follow_symlinks=False):
                 files_count += 1
                 f_size = stat.st_size
@@ -210,20 +290,12 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
                 ext = Path(entry.name).suffix.lower().lstrip(".")
                 ext_key = f".{ext}" if ext else "(Sin extensión)"
                 type_name, color = get_extension_info(ext)
+                _record_extension(entry.name, f_size)
 
-                if ext_key not in extension_map:
-                    extension_map[ext_key] = {
-                        "extension": ext_key,
-                        "type_name": type_name,
-                        "color": color,
-                        "size": 0,
-                        "count": 0,
-                    }
-                extension_map[ext_key]["size"] += f_size
-                extension_map[ext_key]["count"] += 1
-
-                # Guardar archivos significativos para el Treemap
-                if f_size > 512 * 1024:  # > 512 KB
+                # Guardar archivos significativos para el Treemap. Se acota la
+                # lista: en "~" completo se acumulaban cientos de miles de
+                # entradas en memoria solo para quedarse con las 150 mayores.
+                if f_size > 512 * 1024 and len(treemap_items) < MAX_TREEMAP_CANDIDATES:
                     treemap_items.append({
                         "name": entry.name,
                         "path": _path_to_key(Path(entry.path)),
@@ -259,7 +331,7 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
         for c in children:
             c["percent_of_parent"] = round((c["size"] / node_size * 100), 1) if node_size > 0 else 0.0
             # Si el hijo es un directorio grande, añadirlo como bloque de treemap
-            if c["size"] > 2 * 1024 * 1024:  # > 2 MB
+            if c["size"] > 2 * 1024 * 1024 and len(treemap_items) < MAX_TREEMAP_CANDIDATES:
                 type_name, color = "Carpeta", "#3b82f6"
                 treemap_items.append({
                     "name": c["name"],
@@ -315,6 +387,9 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6) -> Dict[str, Any]:
     return {
         "scan_path": _path_to_key(root_resolved),
         "scan_time_seconds": elapsed_seconds,
+        # La interfaz avisa al usuario de que el resultado es parcial en vez de
+        # presentar cifras incompletas como si fueran definitivas.
+        "truncated": truncated,
         "disk_info": {
             "total_space": total_space,
             "total_space_formatted": format_bytes(total_space),
