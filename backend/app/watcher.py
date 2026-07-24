@@ -118,8 +118,25 @@ class _DownloadEventHandler(FileSystemEventHandler):
                     if result:
                         filename = result.get("filename", path.name)
                         category = result.get("category", "")
+                        dest_str = result.get("destination", "")
+
+                        display_dest = ""
+                        if dest_str:
+                            try:
+                                from config.settings import HOME_DIR
+                                rel_dest = Path(dest_str).relative_to(HOME_DIR.resolve())
+                                display_dest = f"~/{rel_dest}"
+                            except Exception:
+                                display_dest = dest_str
+
                         item_label = "Carpeta organizada" if result.get("is_dir") else "Archivo organizado"
-                        msg = f"{item_label}: {filename} ({category})" if category else f"{item_label}: {filename}"
+                        if display_dest:
+                            msg = f"{item_label}: {filename}\n📍 Movido a: {display_dest}"
+                        elif category:
+                            msg = f"{item_label}: {filename} ({category})"
+                        else:
+                            msg = f"{item_label}: {filename}"
+
                         send_notification("Martix", msg)
             except Exception as e:
                 print(f"[Martix Watcher Error] No se pudo organizar {path.name}: {e}", file=sys.stderr)
