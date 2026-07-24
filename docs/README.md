@@ -1,59 +1,44 @@
-# Documentación de Martix
+# Martix Documentation
 
-## Por dónde empezar
+## Quick Start Guide
 
-| Si quieres… | Lee |
+| Goal | Reference Document |
 |---|---|
-| Instalar y usar Martix | [README del proyecto](../README.md) |
-| Entender cómo funciona por dentro | [arquitectura.md](arquitectura.md) |
-| Saber de qué se defiende y cómo | [seguridad.md](seguridad.md) |
-| Ajustar su comportamiento | [configuracion.md](configuracion.md) |
-| Integrarte con la API | [api.md](api.md) |
-| Contribuir código | [desarrollo.md](desarrollo.md) y [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Install and run Martix | [Project README](../README.md) |
+| Understand internal system architecture | [architecture.md](architecture.md) |
+| Review threat models and security defenses | [security.md](security.md) |
+| Configure system settings and environment variables | [configuration.md](configuration.md) |
+| Integrate with the REST API | [api.md](api.md) |
+| Contribute code or test suites | [development.md](development.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) |
 
-## Todos los documentos
+## Document Index
 
-### Cómo funciona
+### Architecture & Operations
 
-- **[arquitectura.md](arquitectura.md)** — Módulos, flujo completo de un
-  archivo desde que aparece en Descargas hasta que queda archivado, modelo de
-  datos, concurrencia y cómo extenderlo.
-- **[api.md](api.md)** — Referencia de los 40+ endpoints REST, con los formatos
-  de petición y los códigos de error.
-- **[configuracion.md](configuracion.md)** — Variables de entorno, categorías,
-  ajustes de la interfaz y dependencias opcionales.
+- **[architecture.md](architecture.md)** — Modular design, complete file processing pipeline from monitoring to archiving, data models, concurrency controls, and extensibility patterns.
+- **[api.md](api.md)** — Complete specification of the 40+ REST API endpoints, payload formats, and status codes.
+- **[configuration.md](configuration.md)** — Environment variables, category definitions, user settings, and optional system dependencies.
 
-### Seguridad
+### Security
 
-- **[seguridad.md](seguridad.md)** — Modelo de amenazas, defensas por vector,
-  riesgos aceptados y recomendaciones de despliegue.
-- **[SECURITY.md](../SECURITY.md)** — Cómo reportar una vulnerabilidad.
+- **[security.md](security.md)** — Threat model, defense mechanisms per attack vector, accepted risks, and deployment security recommendations.
+- **[SECURITY.md](../SECURITY.md)** — Vulnerability reporting policy and disclosure process.
 
-### Historia y decisiones
+### History & Design Decisions
 
-- **[decisiones.md](decisiones.md)** — Registro de decisiones de arquitectura
-  (ADR): el contexto, la decisión y lo que costó.
-- **[auditoria-2026-07.md](auditoria-2026-07.md)** — La auditoría de julio de
-  2026: 16 bugs y 2 vulnerabilidades explotables, cómo se encontraron y cómo se
-  cerraron.
-- **[CHANGELOG.md](../CHANGELOG.md)** — Historial de versiones.
-- **[hoja-de-ruta.md](hoja-de-ruta.md)** — Estado del proyecto, comparativa con
-  alternativas y backlog priorizado.
+- **[decisions.md](decisions.md)** — Architecture Decision Records (ADR): design decisions, context, trade-offs, and historical context.
+- **[audit-2026-07.md](audit-2026-07.md)** — July 2026 Security & Bug Audit Report: 16 confirmed bugs, 2 exploitable security vulnerabilities, and implemented resolutions.
+- **[CHANGELOG.md](../CHANGELOG.md)** — Version release history.
+- **[roadmap.md](roadmap.md)** — Project status, competitive landscape evaluation, and prioritized backlog.
 
-### Contribuir
+### Development
 
-- **[desarrollo.md](desarrollo.md)** — Puesta en marcha, estructura, tests y
-  convenciones del proyecto.
+- **[development.md](development.md)** — Local environment setup, directory structure, test suite execution, and coding conventions.
 
 ---
 
-## Tres cosas que conviene saber antes de tocar el código
+## Core Invariants for Developers
 
-1. **Ninguna ruta de la interfaz se usa sin pasar por
-   `browser.resolve_safe_path()`.** Resuelve los enlaces simbólicos antes de
-   comprobar que cae dentro de la carpeta personal.
-2. **Ningún borrado usa `unlink()` ni `rmtree()`.** Todo pasa por
-   `trash.move_to_trash()`. Martix administra documentos personales; un error
-   no puede ser irreversible.
-3. **Los tests ejecutan el ataque, no comprueban la mitigación.** Si añades una
-   defensa, añade también la sonda que intenta saltársela.
+1. **All UI-supplied file paths must pass through `browser.resolve_safe_path()`.** Symbolic links are resolved prior to checking boundary containment within the user's home directory.
+2. **File deletions must never call `unlink()` or `rmtree()` directly.** All deletions must route through `trash.move_to_trash()`.
+3. **Tests must execute live attack vectors rather than checking static constants.** When adding defenses, include corresponding attack probes that actively attempt to bypass them.

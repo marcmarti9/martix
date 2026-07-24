@@ -1,141 +1,96 @@
-# Historial de cambios
+# Changelog
 
-Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
+All notable changes to Martix will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [Sin publicar]
+## [Unreleased]
 
-### Seguridad
+### Security
 
-- **Corregido un XSS explotable con acceso a la API local.** `escapeHtml()` no
-  escapaba comillas y se usaba dentro de atributos HTML: una carpeta descargada
-  con un nombre preparado escapaba del atributo y ejecutaba JavaScript en el
-  origen de Martix, con acceso a los endpoints de borrado. **Actualiza.**
-- **Corregido un SSRF** en `POST /api/llm/test`: hacía peticiones desde el
-  servidor a cualquier URL y devolvía la respuesta, lo que permitía sondear
-  localhost y la red local a través de Martix. Ahora solo se aceptan IPs
-  literales de loopback.
-- **`/api/browse` ya no lista `~/.ssh`, `~/.aws` ni `~/.gnupg`.** Los nombres de
-  archivo por sí solos indican dónde están las claves.
-- **`create_app()` ya no borra archivos.** Crear la aplicación Flask lanzaba un
-  hilo de mantenimiento que eliminaba documentos del usuario como efecto
-  secundario de arrancar o importar el módulo.
-- **`/api/disk/delete` ya no hace `rmtree` sobre cualquier ruta.** Rechaza rutas
-  protegidas con 403, envía a la papelera y exige confirmación por encima de 25
-  archivos.
-- El contenido de los documentos ya no puede salir del equipo: `MARTIX_LLM_URL`
-  se valida como loopback en cada llamada.
-- Añadidas Content-Security-Policy restrictiva y `X-Frame-Options: DENY`.
-- Límites contra bombas de compresión (`.zip`, `.docx`) y de descompresión de
-  imagen; tope de 256 MB antes de abrir cualquier archivo para leerlo.
-- `notify-send` recibe `--` antes de los datos del usuario: un archivo llamado
-  `--expire-time=0` se interpretaba como opción del comando.
+- **Fixed an exploitable XSS flaw with local API access.** `escapeHtml()` failed to escape quotes and was interpolated inside HTML attribute strings. A downloaded directory named with malicious attributes could break out of the HTML attribute context and execute arbitrary JavaScript under Martix's origin, exposing local API deletion endpoints. **Upgrade immediately.**
+- **Fixed SSRF vulnerability in `POST /api/llm/test`.** Server made HTTP requests to arbitrary user-supplied target URLs and returned response bodies, allowing network probing of localhost and internal LAN services. Endpoints now strictly enforce loopback IP literal checks.
+- **Restricted `/api/browse` from listing sensitive user directories.** Blocked listing of `~/.ssh`, `~/.aws`, and `~/.gnupg` directory structures.
+- **Removed side-effect deletions during `create_app()` initialization.** Creating the Flask application previously launched background maintenance cleanup threads that could delete user files on module import or startup.
+- **Restricted `/api/disk/delete` from performing arbitrary `rmtree` calls.** Protected system paths now return HTTP 403, deletions route to system trash, and folders containing >25 files require explicit user confirmation.
+- **Enforced Loopback Restriction on Document Processing:** `MARTIX_LLM_URL` target address is validated strictly as a loopback endpoint on every API invocation to prevent document content exfiltration.
+- **Added restrictive Content-Security-Policy (CSP) and `X-Frame-Options: DENY` headers.**
+- **Enforced safety limits against archive bombs (`.zip`, `.docx`) and image decompression bombs.** Implemented a strict 256 MB file size cap prior to opening files for inspection.
+- **Hardened `notify-send` execution.** Prepended `--` flags before user data arguments to prevent argument injection attacks from filenames beginning with `-`.
 
-### Añadido
+### Added
 
-- **Papelera** (`app/trash.py`): ningún borrado es definitivo. Usa la papelera
-  nativa del escritorio (`send2trash`) o una cuarentena propia restaurable.
-  Nuevos endpoints `GET /api/trash`, `POST /api/trash/<id>/restore`,
-  `DELETE /api/trash/<id>`.
-- **Prioridad en las reglas**: varias reglas pueden compartir extensión y el
-  orden decide cuál gana. Reordenables desde la interfaz. Nuevos endpoints
-  `PATCH /api/rules/<id>` y `POST /api/rules/reorder`.
-- Operadores `gte` y `lte` en las condiciones (estaban implementados en el motor
-  pero la API los rechazaba).
-- Ajuste `watch_recursive` para vigilar también las subcarpetas (apagado por
-  defecto).
-- Aviso de escaneo parcial en el analizador de espacio cuando se agota el
-  presupuesto de tiempo.
-- Suites `tests/test_regressions.py` (27 casos) y `tests/test_security.py`
-  (12 ataques), más CI en GitHub Actions.
-- Documentación completa en `docs/`.
+- **Trash Module (`app/trash.py`):** Mandatory safe deletion engine using native desktop trash (`Send2Trash`) or a local restorable quarantine store. Added REST API endpoints `GET /api/trash`, `POST /api/trash/<id>/restore`, and `DELETE /api/trash/<id>`.
+- **Rule Priorities:** Multiple rules can now share file extensions, with evaluation order controlled by priority. Added UI drag-and-drop reordering, plus `PATCH /api/rules/<id>` and `POST /api/rules/reorder` API endpoints.
+- **Supported `gte` and `lte` condition operators** across rule API validation schemas.
+- **Added `watch_recursive` setting** to toggle recursive subfolder monitoring (disabled by default).
+- **Added partial scan warnings** in Disk Space Analyzer when scan operations reach time budgets.
+- **Added comprehensive test suites:** `tests/test_regressions.py` (27 cases) and `tests/test_security.py` (12 live attack vectors), alongside GitHub Actions CI workflows.
+- **Expanded documentation suite in `docs/`.**
 
-### Corregido
+### Fixed
 
-- **`UNIQUE(extension)` hacía inútiles las condiciones de las reglas.** Crear una
-  segunda regla `.pdf` sobrescribía la primera en silencio, así que era
-  imposible tener "pdf con *factura*" y "pdf con *contrato*" a la vez.
-- **Archivos que no se archivaban nunca:** los que contenían `.part` en el
-  nombre (`pelicula.part1.rar`, `datos.partition.csv`) y **todos** los de solo
-  lectura, que se reportaban como "en uso".
-- **La clasificación por contenido de `.docx` no funcionaba en ningún documento
-  real:** el XML se truncaba a 20 KB y el parseo fallaba siempre.
-- **Deshacer un desempaquetado no recuperaba nada:** el `.zip` se borraba y el
-  undo solo renombraba la carpeta extraída. Ahora el comprimido se conserva y su
-  archivado sí es reversible.
-- El botón "Deshacer" aparecía en filas donde nunca podía funcionar
-  (desempaquetados, mantenimiento).
-- `content not_contains X` casaba con todos los archivos binarios.
-- Los patrones de renombrado con placeholders vacíos generaban nombres ocultos
-  (`.pdf`) o vacíos.
-- Martix podía mover la carpeta que él mismo estaba vigilando.
-- El mantenimiento borraba *dotfiles* de configuración y dejaba carpetas vacías.
-- **El desinstalador se mataba a sí mismo** (`pkill -f martix` casa con su propia
-  línea de comandos) y nunca llegaba a limpiar los accesos directos, el
-  autostart ni el servicio.
-- En Windows, cada archivo organizado abría un diálogo modal en vez de una
-  notificación.
-- Carrera al comprobar duplicados en el destino si otro worker lo eliminaba.
-- Los enlaces simbólicos se excluyen del organizado, el barrido, el
-  mantenimiento y la deduplicación.
+- **Fixed `UNIQUE(extension)` schema constraint issue.** Previously, adding a second rule for the same extension silently overwrote existing rules, breaking key multi-rule use cases (e.g. distinct handling for invoice vs. contract PDFs).
+- **Fixed unorganized file edge cases:** Addressed false positives in `is_temporary_download_file` caused by `.part` appearing in middle of filenames (e.g., `movie.part1.rar`) and resolved false "file in use" locks on read-only files.
+- **Fixed DOCX text extraction failure:** Corrected XML stream truncation at 20 KB that previously broke document parsing across real-world files.
+- **Fixed archive extraction undo:** Archives are no longer unlinked during extraction; archive moves are fully reversible in history logs.
+- **Hidden non-functional Undo buttons** in UI history rows for non-reversible operations (extractions, maintenance cleanups).
+- **Fixed `content not_contains` operator behavior** on binary file types.
+- **Fixed dynamic renaming patterns** with empty placeholders producing hidden or empty file names.
+- **Prevented self-organizing directory loops** where Martix could move a directory currently under active monitoring.
+- **Hardened maintenance cleanup** to ignore dotfiles and purge empty folder remnants cleanly.
+- **Fixed uninstaller self-termination bug.** `pkill -f martix` previously matched the uninstaller's own command line argument, causing process termination before desktop shortcuts, autostart entries, and systemd services were cleaned up.
+- **Fixed Windows notifications** opening blocking modal dialogs per organized file.
+- **Fixed race conditions** during duplicate file checks in target directories.
+- **Excluded symbolic links** from organization sweeps, maintenance operations, and deduplication tasks.
 
-### Rendimiento
+### Performance
 
-- Leer un ajuste pasa de 10 sentencias SQL a 3: el esquema se valida una vez por
-  proceso, no en cada conexión.
-- Las reglas se leen una vez por barrido, no una vez por archivo.
-- El analizador de espacio usa un acumulador iterativo: un árbol de 60 niveles
-  pasa de 60 marcos de pila a 4.
-- El scheduler espera el intervalo real en vez de despertar cada 0,5 s
-  (172.800 despertares diarios menos).
-- Los 4 hilos del watcher se crean bajo demanda, no al importar `server.py`.
-- Límites en la búsqueda de duplicados (200.000 archivos, 120 s).
+- Reduced SQL statements required to read application settings from 10 to 3 query executions via process-level schema verification caching.
+- Optimized rule loading to fetch once per sweep cycle rather than per file.
+- Refactored Disk Analyzer hierarchy traversal to use an iterative stack accumulator, reducing stack frame overhead from 60 levels to 4 frames on deep directory trees.
+- Refactored background scheduler to eliminate 0.5-second polling loops, reducing CPU wakeups by 172,800 daily cycles.
+- Optimized watcher worker thread allocation to spawn on demand rather than on module import.
+- Enforced execution bounds on duplicate scanning (max 200,000 files, 120-second timeout budget).
 
-### Migración
+### Migration
 
-Automática al arrancar. La tabla `rules` pierde el índice único y gana
-`priority`; `moves_log` gana `undoable`. No se pierde ninguna regla.
-
-Dos dependencias nuevas, ambas **opcionales** (hay camino alternativo si
-faltan): `Send2Trash` y `defusedxml`.
+- Automatic database schema migration on application launch. The `rules` table removes unique extension constraints and adds `priority`; `moves_log` adds `undoable`. Zero data loss on existing rule sets.
+- Added optional dependencies: `Send2Trash` (native desktop trash support) and `defusedxml` (hardened XML parsing).
 
 ---
 
 ## [2026-07-24]
 
-### Añadido
+### Added
 
-- Analizador visual de espacio en disco: árbol con porcentaje del padre,
-  desglose por extensión y treemap *squarified* interactivo en Canvas.
-- Instalador y desinstalador unificados de un clic (`install.sh` /
-  `uninstall.sh`) con acceso de escritorio, autostart, servicio systemd y
-  comando `martix`.
-- Organización de carpetas y subdirectorios completos, no solo archivos sueltos.
-- La ruta de destino aparece en las notificaciones del sistema.
+- **Visual Disk Space Analyzer:** Interactive tree view displaying parent folder utilization percentages, file extension distribution tables, and interactive HTML5 Canvas squarified treemaps.
+- **Unified 1-Click Installer & Uninstaller:** `install.sh` / `uninstall.sh` managing desktop launcher registration, session autostart entries, user systemd services, and `martix` CLI setup.
+- **Full Folder & Directory Organization:** Support for organizing entire directories and subfolders as atomic units.
+- **Enhanced Notifications:** System notifications now display full destination folder paths.
 
-### Cambiado
+### Changed
 
-- El proyecto pasa de llamarse Sortix a **Martix**.
+- Project rebranding from Sortix to **Martix**.
 
 ---
 
 ## [2026-07-22]
 
-### Añadido
+### Added
 
-- Patrulla multi-carpeta en tiempo real sobre Descargas y carpetas vigiladas.
-- Programador de tareas en segundo plano para mantenimiento y barridos.
-- Empaquetado de un clic con PyInstaller (`build_desktop.py`).
-- Deduplicación en dos fases (fast-hash de 64 KB + SHA256).
-- Metadatos EXIF e ID3 en condiciones y plantillas de renombrado.
+- Real-time multi-folder monitoring watchdog across Downloads and custom user directories.
+- Background task scheduler for periodic maintenance cleanups and folder sweeps.
+- PyInstaller single-click desktop build script (`build_desktop.py`).
+- Two-phase duplicate file detection engine (64 KB fast-hash + SHA256).
+- Metadata extraction support (EXIF image data & ID3 audio tags) for conditions and dynamic renaming patterns.
 
 ---
 
 ## [2026-07-19]
 
-### Añadido
+### Added
 
-- Primera versión: clasificación por reglas y Temas, patrulla con watchdog,
-  simulación, historial con deshacer, estadísticas y endurecimiento inicial
-  (anti path-traversal, anti Zip-Slip, guardas de Host/Origin, token de API).
+- Initial project release: Rule-based and Topic classification engine, watchdog patrol daemon, simulation dry-runs, history log with undo support, usage metrics, and initial security hardening (path traversal protection, Zip-Slip prevention, Host/Origin guards, optional API token authentication).

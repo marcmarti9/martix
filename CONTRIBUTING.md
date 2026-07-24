@@ -1,75 +1,59 @@
-# Contribuir a Martix
+# Contributing to Martix
 
-Gracias por querer mejorar Martix. Este documento cubre lo imprescindible; la
-guía completa de desarrollo está en [docs/desarrollo.md](docs/desarrollo.md).
+Thank you for your interest in contributing to Martix! This guide highlights essential conventions for contributing to the repository. A complete development overview is available in [docs/development.md](docs/development.md).
 
-## Reglas de la casa
+## Core Principles
 
-Martix tiene permisos sobre toda la carpeta personal del usuario y procesa
-archivos descargados de internet. Tres cosas no se negocian:
+Martix operates with elevated read and write permissions across the user's home directory and processes untrusted files downloaded from the internet. Three non-negotiable architectural rules govern all development:
 
-1. **Todo local.** Sin telemetría, sin analítica, sin llamadas a servicios
-   externos. La única petición saliente posible es al LLM local, y se valida en
-   cada llamada que el destino sea loopback.
-2. **Ningún borrado es definitivo.** Nada de `unlink()` ni `rmtree()` sobre
-   archivos del usuario: todo pasa por `trash.move_to_trash()`.
-3. **Ninguna ruta se usa sin validar.** Lo que llega de la interfaz pasa por
-   `browser.resolve_safe_path()`; los destinos de reglas, por
-   `security.clean_destination()`.
+1. **100% Local Processing:** Zero telemetry, analytics, or external web API calls. The only outbound HTTP request permitted in the codebase is to a locally hosted LLM endpoint, which is validated on every execution to ensure target addresses resolve strictly to loopback (`127.0.0.1` / `localhost`).
+2. **Non-Destructive Deletions:** Direct calls to `unlink()` or `rmtree()` on user files are strictly prohibited. All deletion operations must route through `trash.move_to_trash()`.
+3. **Strict Path Validation:** Inputs from the user interface or web API must be validated via `browser.resolve_safe_path()`. Rule destination targets must be sanitized via `security.clean_destination()`.
 
-Además: la rama `main` está protegida, todo entra por pull request.
+Furthermore, the `main` branch is protected—all changes must be submitted via Pull Requests.
 
-## Puesta en marcha
+## Local Environment Setup
 
 ```bash
 cd backend
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
-./.venv/bin/python main.py        # interfaz en http://127.0.0.1:5000
+./.venv/bin/python main.py        # Web portal available at http://127.0.0.1:5000
 ```
 
-## Tests
+## Running Tests
 
-Las tres suites son autocontenidas: usan un HOME y una base de datos temporales,
-así que nunca tocan tus archivos.
+All test suites are completely self-contained and run against isolated temporary `HOME` and SQLite database fixtures to ensure zero impact on personal files.
 
 ```bash
 cd backend
-./.venv/bin/python tests/test_all.py           # integración
-./.venv/bin/python tests/test_regressions.py   # regresiones de la auditoría
-./.venv/bin/python tests/test_security.py      # ataques reales
+./.venv/bin/python tests/test_all.py           # Integration test suite
+./.venv/bin/python tests/test_regressions.py   # Audit regression probes
+./.venv/bin/python tests/test_security.py      # Security attack probes
 ```
 
-Las tres tienen que pasar antes de abrir un PR. También se ejecutan en CI.
+All three test suites must pass clean before submitting a Pull Request.
 
-### Cómo se escriben los tests aquí
+### Testing Methodology
 
-**Reproduce el problema, no compruebes que existe una mitigación.** Un test que
-hace `grep` de una constante no demuestra nada; uno que crea un archivo hostil y
-observa qué hace la aplicación, sí.
+**Execute active attack payloads rather than asserting static constants.** A test asserting constant string definitions provides minimal security assurance; a test executing hostile payloads against running application components provides empirical verification.
 
-- ¿Arreglas un bug? Añade su caso a `test_regressions.py`.
-- ¿Añades una defensa? Añade a `test_security.py` la sonda que intenta
-  saltársela.
+- **Fixing a bug?** Add a corresponding test probe to `tests/test_regressions.py`.
+- **Adding a defense mechanism?** Add a corresponding bypass probe to `tests/test_security.py`.
 
-## Estilo
+## Coding & Style Guidelines
 
-- **Comentarios en español**, como el resto del código.
-- Los comentarios explican **por qué**, no qué. Si describe lo que hace la línea
-  de al lado, sobra. Si explica una restricción no obvia —una condición de
-  carrera, un formato heredado, un fallo que ya ocurrió—, es justo lo que hace
-  falta.
-- SQL siempre con parámetros enlazados.
-- Todo lo que va a HTML pasa por `escapeHtml`.
+- **Code Comments:** Write clear technical comments explaining the **rationale** behind non-obvious code paths (e.g. race condition handling, backwards compatibility constraints, or past regression fixes) rather than restating self-evident code statements.
+- **SQL Security:** Always use parameterized queries for database interactions. Never concatenate untrusted parameters into SQL strings.
+- **XSS Prevention:** Ensure all dynamic variables rendered into HTML contexts are sanitized via `escapeHtml()`.
 
-## Pull requests
+## Pull Request Guidelines
 
-- Un PR, un tema.
-- Explica el **porqué** en la descripción: el qué se ve en el diff.
-- Si cambias comportamiento visible, actualiza `CHANGELOG.md`.
-- Si tomas una decisión de arquitectura, añade su ADR a
-  [docs/decisiones.md](docs/decisiones.md).
+- Focus each Pull Request on a single logical change or feature.
+- Provide clear context and rationale in the Pull Request description.
+- Update `CHANGELOG.md` when introducing user-facing behavioral changes.
+- Record significant architectural changes in [docs/decisions.md](docs/decisions.md) via an Architecture Decision Record (ADR).
 
-## Vulnerabilidades
+## Security Reporting
 
-No abras una incidencia pública. Sigue [SECURITY.md](SECURITY.md).
+Do not open public GitHub issues for suspected security vulnerabilities. Follow the security reporting process in [SECURITY.md](SECURITY.md).

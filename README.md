@@ -1,94 +1,78 @@
 <h1 align="center">Martix</h1>
 
-<p align="center"><strong>Organizador de archivos en tiempo real, privado y 100% local.</strong></p>
+<p align="center"><strong>Real-time, private, and 100% local smart file organizer and disk space analyzer.</strong></p>
 
 <p align="center">
-  Martix vive en segundo plano, vigila tus Descargas y archiva cada documento en
-  cuanto llega — con reglas visuales, lectura del contenido, OCR local o una IA
-  que corre en tu propio equipo. Nada sale de tu ordenador. Nada se borra sin
-  poder recuperarlo.
+  Martix runs silently in the background, monitors your Downloads folder, and automatically archives incoming files—powered by visual rules, content extraction, local OCR, or an optional local LLM running directly on your machine. Nothing leaves your computer. No file deletion is ever permanent.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+" />
   <img src="https://img.shields.io/badge/Flask-3.0%2B-black?style=flat-square&logo=flask&logoColor=white" alt="Flask 3" />
-  <img src="https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Plataformas" />
-  <img src="https://img.shields.io/badge/Licencia-MIT-green?style=flat-square" alt="Licencia MIT" />
-  <img src="https://img.shields.io/badge/telemetr%C3%ADa-cero-success?style=flat-square" alt="Sin telemetría" />
+  <img src="https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Platforms" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/telemetry-zero-success?style=flat-square" alt="Zero Telemetry" />
 </p>
 
 ---
 
-## Por qué
+## Why Martix?
 
-Tu carpeta de Descargas es un vertedero: facturas, capturas, ZIPs, PDFs del
-banco, música. Ordenarla a mano cuesta tiempo, y las alternativas en la nube te
-piden subir precisamente los documentos que menos te apetece subir.
+Your Downloads folder is often a chaotic dump: invoices, screenshots, ZIP archives, bank statements, and audio files. Manual organization is tedious and time-consuming, while cloud-based file management tools require uploading private documents to external servers.
 
-Martix hace ese trabajo en tu equipo. Sin cuenta, sin servidor, sin telemetría.
+Martix performs all organization locally on your device. No user accounts, no external servers, and zero telemetry.
 
-**Y con una regla que no se negocia: ningún borrado es definitivo.** Todo lo
-que Martix elimina va a la papelera de tu escritorio (o a una cuarentena propia
-si no la hay). Un programa con permisos sobre toda tu carpeta personal no puede
-permitirse el lujo de equivocarse de forma irreversible.
+**Strict Core Guarantee: No file deletion is permanent.** Everything deleted by Martix is safely dispatched to your system trash (or a local quarantine directory if unavailable). An application with permissions over your personal user directory must never perform irreversible actions.
 
 ---
 
-## Qué hace
+## Key Features
 
-### Archiva solo, en cuanto llega
+### Automated Real-Time Archiving
 
-Vigila tus Descargas y las carpetas que le indiques. Espera a que la descarga
-termine de verdad — comprueba que el archivo deja de crecer y que ningún
-programa lo tiene abierto — y lo archiva. También carpetas enteras: un álbum de
-fotos descargado se mueve como una unidad.
+Monitors your Downloads and user-selected folders in real time. Martix waits until downloads are fully settled—verifying file size stability and confirming no process holds an active write lock—before processing. Full directories (e.g., downloaded photo albums) are organized atomically as single units.
 
-### Decide con lo que hay dentro, no solo con el nombre
+### Intelligent Content Classification
 
-```
-1. Tus reglas          →  "PDF que contiene 'factura' → Documentos/Facturas"
-2. Tus Temas           →  busca palabras clave en el nombre y en el CONTENIDO
-                          de PDF, DOCX y TXT (y en imágenes, con OCR local)
-3. Subcategorías       →  capturas de pantalla, currículums, recibos…
-4. IA local (opcional) →  Ollama en tu equipo sugiere una carpeta
-5. Categoría base      →  por extensión, como último recurso
-```
-
-### Reglas que se combinan de verdad
-
-Varias reglas por extensión, con condiciones en AND sobre nombre, tamaño,
-antigüedad, contenido y metadatos EXIF/ID3. El orden lo decides tú arrastrando
-en la lista: gana la primera que coincide.
+Martix evaluates incoming files using a priority cascade:
 
 ```
-.pdf  +  contenido contiene "factura"     →  Documentos/Facturas
-.pdf  +  contenido contiene "contrato"    →  Documentos/Contratos
-.jpg  +  cámara es "NIKON Z6"             →  Fotos/Réflex/{EXIF_DATE}
- *    +  antigüedad > 365 días            →  Archivo/{FILE_YYYY}
+1. Custom User Rules     → e.g., "PDF containing 'invoice' → Documents/Invoices"
+2. User Topics           → Keyword matching on filename and full text content
+                           (PDF, DOCX, TXT, plus images via local Tesseract OCR)
+3. Subcategories         → Pattern matching (screenshots, receipts, resumes, etc.)
+4. Local LLM (Optional)  → Ollama running locally suggests an appropriate folder
+5. Base Category         → Extension fallback as final resort
 ```
 
-### Y además
+### Flexible Priority Rules
 
-- **Renombrado con plantillas** — `{YYYY}`, `{Topic}`, `{ARTIST}`, `{EXIF_DATE}`,
-  `{OriginalName}`…
-- **Analizador de espacio en disco** — árbol con porcentajes, desglose por
-  extensión y treemap interactivo en Canvas.
-- **Detector de duplicados** — dos fases (fast-hash de 64 KB → SHA256), para no
-  releer gigabytes.
-- **Extracción segura de comprimidos** — con protección anti Zip-Slip y contra
-  bombas de compresión. El `.zip` original se conserva.
-- **Limpieza por antigüedad** programable, siempre a la papelera.
-- **Simulación** — mira qué haría antes de dejarle hacerlo.
-- **Deshacer** desde el historial.
-- **Aprende de tus correcciones** — si mueves un archivo a mano, te propone la
-  regla.
-- Interfaz bilingüe ES/EN, tema claro y oscuro.
+Multiple rules per extension with combined `AND` conditions over file name, size, age, text content, and metadata (EXIF/ID3). Drag-and-drop rule ordering ensures the highest-priority rule wins.
+
+```
+.pdf  +  content contains "invoice"       →  Documents/Invoices
+.pdf  +  content contains "contract"      →  Documents/Contracts
+.jpg  +  camera equals "NIKON Z6"        →  Photos/Reflex/{EXIF_DATE}
+ *    +  age > 365 days                  →  Archive/{FILE_YYYY}
+```
+
+### Additional System Capabilities
+
+- **Pattern-Based Dynamic Renaming** — Placeholders including `{YYYY}`, `{Topic}`, `{ARTIST}`, `{EXIF_DATE}`, `{OriginalName}`, and more.
+- **Visual Disk Space Analyzer** — Interactive tree hierarchy with parent percentage utilization, extension breakdown, and an interactive HTML5 Canvas squarified treemap.
+- **Fast Two-Phase Deduplication** — High-performance 64 KB fast-hash filtering followed by SHA256 verification to prevent unnecessary multi-gigabyte disk scans.
+- **Safe Archive Extraction** — Automatic ZIP/TAR extraction with strict Zip-Slip protection, expansion limits, and path traversal guards. Original archives are preserved.
+- **Scheduled Maintenance & Auto-Trash** — Automated age-based cleanup policies that route directly to trash.
+- **Dry-Run Simulation Mode** — Preview rule evaluations and destination paths before applying changes.
+- **One-Click Undo** — Revert moves directly from execution history logs.
+- **Adaptive Rule Suggestions** — Suggests new rules when manual file corrections are detected.
+- **Bilingual Interface** — English and Spanish UI with dark and light themes.
 
 ---
 
-## Instalación
+## Installation
 
-### Un comando (Linux)
+### Automatic Installation (Linux)
 
 ```bash
 git clone https://github.com/marcmarti9/martix.git
@@ -96,11 +80,9 @@ cd martix
 ./install.sh
 ```
 
-Instala dependencias, registra Martix en el menú de aplicaciones, lo arranca al
-iniciar sesión, activa el servicio en segundo plano e instala el comando
-`martix`. Para revertirlo: `./uninstall.sh`.
+`install.sh` builds the virtual environment, installs dependencies, registers application shortcuts, configures autostart/systemd services, and installs the global `martix` CLI command. To clean uninstall: `./uninstall.sh`.
 
-### A mano (cualquier sistema)
+### Manual Setup (Cross-Platform)
 
 ```bash
 git clone https://github.com/marcmarti9/martix.git
@@ -111,92 +93,76 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Abre <http://127.0.0.1:5000>. Para una ventana de escritorio sin navegador:
+Access the web portal at <http://127.0.0.1:5000>. For a standalone desktop window without a browser tab:
 `python desktop.py`.
 
-### Opcionales
+### Optional Integrations
 
-| Para… | Instala |
+| Feature | Requirement |
 |---|---|
-| Leer texto dentro de imágenes | Tesseract (`sudo apt install tesseract-ocr`) |
-| Clasificación con IA local | [Ollama](https://ollama.com) + `MARTIX_LLM=1` |
-| Ventana de escritorio nativa | `pip install -r requirements-desktop.txt` |
+| Image OCR Content Extraction | Tesseract OCR (`sudo apt install tesseract-ocr`) |
+| Local AI Classification | [Ollama](https://ollama.com) + `MARTIX_LLM=1` |
+| Native Desktop Window | `pip install -r requirements-desktop.txt` |
 
 ---
 
-## Privacidad
+## Privacy Architecture
 
-Esto no es un eslogan, es una restricción del código:
+Privacy in Martix is enforced directly by codebase constraints:
 
-- **Una sola petición saliente posible** en todo el proyecto: al LLM local. Se
-  valida en cada llamada que el destino sea una IP de loopback. Si apuntas
-  `MARTIX_LLM_URL` a un servidor remoto, Martix se niega a enviar nada y lo
-  registra en el log.
-- **El servidor escucha solo en `127.0.0.1`.** Si cambias `HOST`, se niega a
-  arrancar sin un token de acceso.
-- **Cero telemetría, cero analítica, cero cuentas.** No hay a dónde enviarlo.
-- **La interfaz no carga nada de internet.** Sin CDNs, sin fuentes remotas: lo
-  impide su propia Content-Security-Policy.
+- **Single Outbound Network Path:** The only permitted HTTP request across the entire repository is to a local LLM instance. Every outbound call validates that the target URL resolves strictly to a loopback address (`127.0.0.1` / `localhost`). Setting `MARTIX_LLM_URL` to a remote host causes Martix to reject the request and log a warning.
+- **Local Host Binding:** Server binds strictly to `127.0.0.1`. Binding to external interfaces requires setting an explicit `MARTIX_TOKEN`.
+- **Zero Telemetry:** No analytics, tracking code, or user accounts.
+- **Isolated Frontend Assets:** Interface assets are self-contained with no external CDN or remote font dependencies, enforced by a restrictive Content-Security-Policy (CSP).
 
-Los detalles, incluidos los riesgos que se aceptan a conciencia, están en
-[docs/seguridad.md](docs/seguridad.md).
+Detailed threat models and security bounds are available in [docs/security.md](docs/security.md).
 
 ---
 
-## Documentación
+## Documentation
 
-| | |
+| Document | Description |
 |---|---|
-| [Arquitectura](docs/arquitectura.md) | Cómo funciona por dentro, módulo a módulo |
-| [Seguridad](docs/seguridad.md) | Modelo de amenazas y defensas |
-| [Configuración](docs/configuracion.md) | Variables de entorno, categorías, ajustes |
-| [API REST](docs/api.md) | Referencia completa de endpoints |
-| [Desarrollo](docs/desarrollo.md) | Puesta en marcha, tests, convenciones |
-| [Decisiones (ADR)](docs/decisiones.md) | Por qué el proyecto es como es |
-| [Auditoría 2026-07](docs/auditoria-2026-07.md) | 16 bugs y 2 vulnerabilidades, y cómo se cerraron |
-| [Hoja de ruta](docs/hoja-de-ruta.md) | Estado y backlog |
+| [Architecture](docs/architecture.md) | Internal modular architecture and execution flow |
+| [Security Model](docs/security.md) | Threat model, defense mechanisms, and bounds |
+| [Configuration](docs/configuration.md) | Environment variables, categories, and settings |
+| [REST API Reference](docs/api.md) | Endpoint reference specification |
+| [Development Guide](docs/development.md) | Local environment setup, test suites, and conventions |
+| [Architecture Decisions (ADR)](docs/decisions.md) | Architecture Decision Records (ADRs) |
+| [July 2026 Audit Report](docs/audit-2026-07.md) | Comprehensive audit report and vulnerability fixes |
+| [Project Roadmap](docs/roadmap.md) | Project status and prioritized feature backlog |
 
 ---
 
-## Tests
+## Testing & Verification
 
 ```bash
 cd backend
-.venv/bin/python tests/test_all.py           # integración
-.venv/bin/python tests/test_regressions.py   # un caso por bug corregido
-.venv/bin/python tests/test_security.py      # ataques reales contra la app
+.venv/bin/python tests/test_all.py           # Integration test suite
+.venv/bin/python tests/test_regressions.py   # Audit regression probes (27 test cases)
+.venv/bin/python tests/test_security.py      # Live security attack probes (12 test cases)
 ```
 
-Las suites de seguridad y regresión **no comprueban que exista una mitigación:
-ejecutan el ataque**. Levantan un servidor HTTP para probar el SSRF, crean
-enlaces simbólicos para intentar escapar de la carpeta personal y ejecutan el
-escapado real del frontend. Si alguien debilita una defensa, salen en rojo.
-
-Todas usan un HOME y una base de datos temporales, así que no tocan tus
-archivos.
+The security and regression test suites do not merely check code constants; **they actively execute attack payloads against the running application**. Test execution isolated inside temporary `HOME` and SQLite database fixtures ensures zero side effects on user data.
 
 ---
 
-## Estado
+## Current Status
 
-Funcional y en uso diario. La auditoría de julio de 2026 encontró y cerró 16
-bugs y 2 vulnerabilidades explotables; el detalle está en
-[docs/auditoria-2026-07.md](docs/auditoria-2026-07.md).
+Fully functional and in active daily production. The July 2026 security audit verified and resolved 16 logic bugs and 2 exploitable security vulnerabilities; comprehensive details are in [docs/audit-2026-07.md](docs/audit-2026-07.md).
 
-Es un proyecto personal mantenido en abierto: úsalo, pero haz copia de seguridad
-de lo que te importe antes de soltarlo sobre carpetas críticas, y prueba tus
-reglas con **Simular** primero.
+Martix is an open-source personal software project. Always maintain independent backups of critical data before running automated file operations, and utilize **Simulation Mode** to verify rule outcomes.
 
 ---
 
-## Contribuir
+## Contributing
 
-Las incidencias y los PRs son bienvenidos — lee [CONTRIBUTING.md](CONTRIBUTING.md)
-y [docs/desarrollo.md](docs/desarrollo.md).
+Contributions and issue reports are welcome! Please review [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
 
-¿Has encontrado un fallo de seguridad? No abras una incidencia pública: sigue
-[SECURITY.md](SECURITY.md).
+To report security concerns, please consult [SECURITY.md](SECURITY.md).
 
-## Licencia
+---
 
-[MIT](LICENSE). Creado por Marc Martí Torralba.
+## License
+
+Distributed under the [MIT License](LICENSE).

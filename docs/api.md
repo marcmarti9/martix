@@ -1,201 +1,177 @@
-# Referencia de la API REST
+# REST API Reference
 
-Base: `http://127.0.0.1:5000`. Todas las respuestas son JSON.
+Base URL: `http://127.0.0.1:5000`. All responses are formatted in JSON.
 
-**Autenticación.** Ninguna mientras Martix escuche solo en `127.0.0.1`. Si
-defines `MARTIX_TOKEN` en `backend/.env`, toda ruta `/api/*` exige la cabecera
-`X-Martix-Token`. Es **obligatorio** si cambias `HOST`: el servidor se niega a
-arrancar sin él.
+**Authentication:** None required when Martix is bound exclusively to `127.0.0.1`. If `MARTIX_TOKEN` is specified in `backend/.env`, all `/api/*` endpoints require the `X-Martix-Token` request header. Setting an explicit API token is **mandatory** when `HOST` is changed from local loopback; the server will refuse to start without it.
 
-**Guardas comunes** (`app/security.py:check_request`): la cabecera `Host` debe
-ser local; en métodos que cambian estado, si el navegador envía `Origin`, debe
-ser de confianza. Cuerpo máximo: 2 MB.
+**Request Guards** (`app/security.py:check_request`): The `Host` header must be local (`127.0.0.1` or `localhost`). For state-changing methods, if an `Origin` header is sent by the browser, it must match trusted origins. Maximum HTTP request body size is 2 MB.
 
 ---
 
-## Estado y control
+## Status & Control
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/status` | Patrulla activa, total organizado, carpeta de descargas |
-| `POST` | `/api/patrol/toggle` | Enciende/apaga la patrulla. Cuerpo: `{"active": true}` (opcional, alterna si falta) |
-| `POST` | `/api/organize-now` | Barrido inmediato de Descargas y carpetas vigiladas |
-| `POST` | `/api/simulate` | Dry-run: qué haría con cada archivo, sin mover nada |
-| `GET` | `/api/statistics` | Total, top categorías y actividad de 30 días |
+| `GET` | `/api/status` | Patrol daemon status, total organized count, and active downloads folder |
+| `POST` | `/api/patrol/toggle` | Enable/disable active monitoring. Body: `{"active": true}` (optional; toggles if omitted) |
+| `POST` | `/api/organize-now` | Trigger immediate scan and organization sweep |
+| `POST` | `/api/simulate` | Perform dry-run simulation without moving files |
+| `GET` | `/api/statistics` | Metrics summary: total organized, top categories, and 30-day activity history |
 
-## Reglas
+## Rule Management
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/rules` | Reglas **en orden de evaluación** (la primera que casa gana) |
-| `POST` | `/api/rules` | Crea una regla. Varias pueden compartir extensión |
-| `PATCH`/`PUT` | `/api/rules/<id>` | Modifica campos concretos |
-| `POST` | `/api/rules/reorder` | Reordena. Cuerpo: `{"ids": [3, 1, 2]}` |
-| `DELETE` | `/api/rules/<id>` | Elimina |
-| `GET` | `/api/rules/export` | Exporta reglas y reglas de mantenimiento |
-| `POST` | `/api/rules/import` | Importa (las inválidas se descartan en silencio) |
+| `GET` | `/api/rules` | Fetch rules **in evaluation order** (first matching rule wins) |
+| `POST` | `/api/rules` | Create a rule. Multiple rules can share the same file extension |
+| `PATCH`/`PUT` | `/api/rules/<id>` | Update specific rule fields |
+| `POST` | `/api/rules/reorder` | Update rule ordering. Body: `{"ids": [3, 1, 2]}` |
+| `DELETE` | `/api/rules/<id>` | Delete rule |
+| `GET` | `/api/rules/export` | Export rules and maintenance rules as JSON |
+| `POST` | `/api/rules/import` | Import rule set (invalid rules are silently skipped) |
 
 ```jsonc
 // POST /api/rules
 {
-  "extension": "pdf",              // o "*" para comodín
-  "destination": "Documents/Facturas",  // relativa a tu carpeta personal
-  "rename_pattern": "{FILE_YYYY}-{OriginalName}",   // opcional
-  "conditions": [                  // opcional, se combinan con AND
-    { "field": "content", "operator": "contains", "value": "factura" }
+  "extension": "pdf",              // or "*" for wildcard
+  "destination": "Documents/Invoices",  // relative to home directory
+  "rename_pattern": "{FILE_YYYY}-{OriginalName}",   // optional
+  "conditions": [                  // optional, combined with logical AND
+    { "field": "content", "operator": "contains", "value": "invoice" }
   ]
 }
 ```
 
-**Campos:** `name`, `stem`, `extension`, `size_kb`, `age_days`, `content`,
-`artist`, `album`, `title`, `year`, `camera`, `exif_date`.
-**Operadores:** `contains`, `not_contains`, `equals`, `starts_with`,
-`ends_with`, `gt`, `lt`, `gte`, `lte`.
+**Supported Fields:** `name`, `stem`, `extension`, `size_kb`, `age_days`, `content`, `artist`, `album`, `title`, `year`, `camera`, `exif_date`.
 
-> El orden importa: una regla `.pdf` sin condiciones colocada arriba deja
-> muertas a todas las `.pdf` condicionales de debajo. Ver
-> [arquitectura.md](arquitectura.md#4-modelo-de-datos).
+**Supported Operators:** `contains`, `not_contains`, `equals`, `starts_with`, `ends_with`, `gt`, `lt`, `gte`, `lte`.
 
-**Placeholders de renombrado:** `{YYYY}` `{MM}` `{DD}` (hoy), `{FILE_YYYY}`
-`{FILE_MM}` `{FILE_DD}` (fecha del archivo), `{OriginalName}`, `{Topic}`,
-`{Category}`, `{ext}`, `{ARTIST}`, `{ALBUM}`, `{TITLE}`, `{CAMERA}`,
-`{EXIF_DATE}`, `{YEAR}`. Si el patrón se resuelve a vacío se conserva el nombre
-original.
+> Rule ordering is significant: an unconditional `.pdf` rule placed above conditional `.pdf` rules will shadow the conditional rules below it. See [architecture.md](architecture.md#4-data-model).
 
-## Temas
+**Dynamic Rename Placeholders:** `{YYYY}`, `{MM}`, `{DD}` (current date), `{FILE_YYYY}`, `{FILE_MM}`, `{FILE_DD}` (file modification date), `{OriginalName}`, `{Topic}`, `{Category}`, `{ext}`, `{ARTIST}`, `{ALBUM}`, `{TITLE}`, `{CAMERA}`, `{EXIF_DATE}`, `{YEAR}`. If a pattern evaluates to an empty string, the original filename is preserved.
 
-| Método | Ruta | Descripción |
+## Topic Management
+
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/topics` | Lista |
-| `POST` | `/api/topics` | `{"name", "destination", "keywords": [...], "rename_pattern"}` |
-| `DELETE` | `/api/topics/<id>` | Elimina |
+| `GET` | `/api/topics` | List topics |
+| `POST` | `/api/topics` | Create topic: `{"name", "destination", "keywords": [...], "rename_pattern"}` |
+| `DELETE` | `/api/topics/<id>` | Delete topic |
 
-## Historial
+## History Logs
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/log?limit=50` | Movimientos recientes (máx. 500) |
-| `POST` | `/api/log/<id>/undo` | Devuelve el archivo a su origen |
+| `GET` | `/api/log?limit=50` | Retrieve recent move history (max limit 500) |
+| `POST` | `/api/log/<id>/undo` | Revert file move to original path |
 
-Cada fila incluye `undoable`. Es `false` en desempaquetados y borrados de
-mantenimiento: no son movimientos y no hay nada que devolver. Intentar
-deshacerlos responde `409` con la vía correcta.
+Each record contains an `undoable` boolean flag. This flag is `false` for archive extractions and maintenance cleanups, as they are non-reversible events. Undo requests on non-reversible items return HTTP `409 Conflict`.
 
-## Papelera
+## Trash Management
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/trash` | `{"native": bool, "items": [...]}` |
-| `POST` | `/api/trash/<id>/restore` | Devuelve el elemento a su ruta original |
-| `DELETE` | `/api/trash/<id>` | Borra definitivamente |
+| `GET` | `/api/trash` | List trash contents: `{"native": bool, "items": [...]}` |
+| `POST` | `/api/trash/<id>/restore` | Restore item to original directory path |
+| `DELETE` | `/api/trash/<id>` | Permanently purge item |
 
-`native: true` significa que se usa la papelera del escritorio (`send2trash`) y
-que se recupera desde el gestor de archivos, no desde aquí.
+When `native` is `true`, desktop trash integration (`Send2Trash`) is active, and item restoration is managed via the operating system's native file manager.
 
-## Explorador
+## Directory Explorer
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/tree` | Árbol de la barra lateral |
-| `GET` | `/api/browse?path=Documents` | Contenido de una carpeta |
+| `GET` | `/api/tree` | Sidebar folder tree structure |
+| `GET` | `/api/browse?path=Documents` | Directory contents listing |
 
-Las rutas protegidas (`~/.ssh`, `~/.config`…) se ocultan del listado y devuelven
-`403` si se intenta entrar.
+Protected system paths (`~/.ssh`, `~/.config`, etc.) are hidden from directory listings and return HTTP `403 Forbidden` if accessed directly.
 
-## Carpetas vigiladas
+## Monitored Folders
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/watched-folders` | Lista |
-| `POST` | `/api/watched-folders` | `{"folder_path": "Escritorio/Escaneos"}` |
-| `DELETE` | `/api/watched-folders/<id>` | Elimina |
+| `GET` | `/api/watched-folders` | List monitored directories |
+| `POST` | `/api/watched-folders` | Add directory: `{"folder_path": "Desktop/Scans"}` |
+| `DELETE` | `/api/watched-folders/<id>` | Remove directory monitoring |
 
-## Mantenimiento
+## Maintenance Cleanup Rules
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/maintenance/rules` | Lista (alias: `/api/maintenance`) |
-| `POST` | `/api/maintenance/rules` | `{"directory_path", "max_age_days", "active"}` |
-| `DELETE` | `/api/maintenance/rules/<id>` | Elimina |
-| `POST` | `/api/maintenance/run` | Ejecuta ahora |
+| `GET` | `/api/maintenance/rules` | List maintenance rules (alias: `/api/maintenance`) |
+| `POST` | `/api/maintenance/rules` | Create rule: `{"directory_path", "max_age_days", "active"}` |
+| `DELETE` | `/api/maintenance/rules/<id>` | Delete rule |
+| `POST` | `/api/maintenance/run` | Execute maintenance sweep immediately |
 
-Los archivos van a la **papelera**, no se borran. Se saltan los ocultos y las
-rutas protegidas.
+Files processed by maintenance rules are moved to **trash**, never permanently deleted. Hidden files (dotfiles) and protected system paths are strictly skipped.
 
-## Duplicados
+## Duplicate Detection
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET`/`POST` | `/api/duplicates` | Busca. `POST {"directories": [...]}` para acotar |
-| `POST` | `/api/duplicates/clean` | `{"files": [...]}` → a la papelera |
+| `GET`/`POST` | `/api/duplicates` | Search duplicates. `POST {"directories": [...]}` to bound search scope |
+| `POST` | `/api/duplicates/clean` | Move selected duplicate files to trash: `{"files": [...]}` |
 
-Dos fases: agrupación por tamaño → fast-hash de 64 KB → SHA256 completo.
-Acotado a 200.000 archivos y 120 s.
+Two-phase detection pipeline: Group by exact size → 64 KB fast-hash → SHA256 full digest verification. Scans are bounded to a maximum of 200,000 files and a 120-second timeout budget.
 
-## Analizador de espacio
+## Disk Space Analyzer
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/disk/drives` | Ubicaciones escaneables |
-| `POST` | `/api/disk/scan` | `{"path": "Documents"}` |
-| `POST` | `/api/disk/delete` | `{"path": "...", "confirm": false}` |
+| `GET` | `/api/disk/drives` | Fetch target storage locations |
+| `POST` | `/api/disk/scan` | Scan directory structure: `{"path": "Documents"}` |
+| `POST` | `/api/disk/delete` | Delete path: `{"path": "...", "confirm": false}` |
 
-`scan` devuelve `truncated: true` si se agotó el presupuesto de tiempo; los
-totales son entonces incompletos.
+`POST /api/disk/scan` returns `"truncated": true` if the scan reached execution time limits, signaling that totals reflect a partial scan.
 
-`delete` responde `409` con `needs_confirmation` y `file_count` si la carpeta
-tiene más de 25 archivos; repite con `"confirm": true`. Devuelve `403` en rutas
-protegidas. Siempre va a la papelera.
+`POST /api/disk/delete` returns HTTP `409 Conflict` with `needs_confirmation: true` and `file_count` if a target directory contains >25 files. Resubmit with `"confirm": true` to proceed. Protected paths return HTTP `403 Forbidden`. Deletions route to trash.
 
-## Ajustes
+## System Settings
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET`/`POST` | `/api/settings` | Ajustes generales |
+| `GET`/`POST` | `/api/settings` | Read or update configuration settings |
 
 ```jsonc
 {
   "duplicate_action": "suffix",  // "suffix" | "skip" | "delete_source"
   "onboarded": true,
   "unpack_archives": true,
-  "watch_recursive": false,      // vigilar subcarpetas (ver nota abajo)
-  "native_trash": true           // solo lectura: si send2trash está disponible
+  "watch_recursive": false,      // recursive subfolder monitoring (see note below)
+  "native_trash": true           // read-only: indicates Send2Trash availability
 }
 ```
 
-> `watch_recursive` archiva cada archivo interno por separado, lo que deshace la
-> estructura de las carpetas descargadas. Por eso está apagado por defecto.
+> `watch_recursive` archives internal nested files independently, which disassembles downloaded directory structures. It is disabled by default.
 
-## Programador
+## Scheduler Configuration
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/scheduler/config` | Configuración actual |
-| `POST`/`PUT` | `/api/scheduler/config` | `{"enabled": true, "interval_minutes": 60}` |
-| `POST` | `/api/scheduler/run` | Ejecuta ya (alias: `/run-now`) |
+| `GET` | `/api/scheduler/config` | Fetch scheduler configuration |
+| `POST`/`PUT` | `/api/scheduler/config` | Update scheduler: `{"enabled": true, "interval_minutes": 60}` |
+| `POST` | `/api/scheduler/run` | Execute scheduled tasks immediately (alias: `/run-now`) |
 
-## LLM local
+## Local AI Integration (LLM)
 
-| Método | Ruta | Descripción |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/llm/status` | Si está activado, URL y modelo |
-| `POST` | `/api/llm/test` | Prueba la conexión con Ollama |
-| `POST` | `/api/learn-correction` | Sugiere una regla a partir de una corrección manual |
+| `GET` | `/api/llm/status` | Return local LLM status, model name, and target URL |
+| `POST` | `/api/llm/test` | Test connectivity with local Ollama endpoint |
+| `POST` | `/api/learn-correction` | Generate rule suggestions from manual user file moves |
 
-`/api/llm/test` **solo acepta direcciones de loopback** (IP literal o
-`localhost`). Cualquier otro destino devuelve `400`: sin esta restricción el
-endpoint sería un SSRF, y la promesa de privacidad no tendría respaldo.
+`/api/llm/test` **strictly validates that target endpoints resolve to loopback addresses** (literal IP addresses or `localhost`). Remote target addresses return HTTP `400 Bad Request` to ensure privacy and prevent SSRF vectors.
 
 ---
 
-## Errores
+## Status & Error Codes
 
-| Código | Significado |
+| HTTP Code | Meaning |
 |---|---|
-| `400` | Entrada inválida (ruta no permitida, condición no reconocida…) |
-| `401` | Token ausente o incorrecto |
-| `403` | Host/Origin no reconocido, o ruta protegida |
-| `404` | No existe |
-| `409` | Conflicto: undo imposible, o confirmación requerida |
-| `413` | Cuerpo mayor de 2 MB |
-| `500` | Error interno (el detalle va al log, no a la respuesta) |
+| `400 Bad Request` | Invalid input data (disallowed path, invalid condition operator) |
+| `401 Unauthorized` | Missing or invalid API authentication token |
+| `403 Forbidden` | Unrecognized Host/Origin header or access attempt on protected path |
+| `404 Not Found` | Requested resource does not exist |
+| `409 Conflict` | Operation conflict (non-reversible undo request or explicit confirmation required) |
+| `413 Payload Too Large` | Request body exceeds 2 MB limit |
+| `500 Internal Server Error` | Application exception (detailed trace logged locally, omitted from response) |

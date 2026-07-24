@@ -1,72 +1,56 @@
-# Política de seguridad
+# Security Policy
 
-Martix tiene permisos de lectura y escritura sobre toda la carpeta personal del
-usuario y procesa archivos descargados de internet. Los informes de seguridad se
-toman en serio.
+Martix operates with read and write permissions across the user's home directory and automatically processes files downloaded from external network sources. Security report disclosures are treated with high priority.
 
-## Versiones con soporte
+## Supported Versions
 
-| Versión | Soporte |
-|---|---|
-| `main` | ✅ |
-| Anteriores a la auditoría de 2026-07 | ❌ — contienen un XSS explotable con acceso a la API local. Actualiza |
+| Version | Supported | Notes |
+|---|---|---|
+| `main` | ✅ | Active support |
+| Pre-July 2026 Audit | ❌ | Contains an exploitable XSS flaw with local API access. Update immediately. |
 
-## Cómo reportar una vulnerabilidad
+## Reporting a Vulnerability
 
-**No abras una incidencia pública.**
+**Please do not report security vulnerabilities through public GitHub issues.**
 
-Usa el [aviso de seguridad privado de GitHub](https://github.com/marcmarti9/martix/security/advisories/new),
-que es el canal preferido.
+Use [GitHub Private Vulnerability Reporting](https://github.com/marcmarti9/martix/security/advisories/new), which is the preferred disclosure channel.
 
-Incluye, si puedes:
+When reporting, please include:
 
-- Qué versión o commit estás probando.
-- Los pasos para reproducirlo (una prueba de concepto ayuda muchísimo).
-- Qué consigue un atacante: leer archivos, borrarlos, ejecutar código…
-- Qué necesita para conseguirlo: ¿basta con que descargues un archivo?
-  ¿hace falta que abras una web concreta? ¿acceso local al equipo?
+- The specific commit or version under test.
+- Step-by-step reproduction steps or a minimal Proof of Concept (PoC).
+- Impact assessment (e.g. file read, file deletion, remote code execution).
+- Required attack prerequisites (e.g., downloading a malicious file, visiting a web page, or local machine access).
 
-Intentaré responder en unos días. Es un proyecto personal, no hay un equipo
-detrás ni programa de recompensas, pero se te acreditará en el aviso y en el
-CHANGELOG salvo que prefieras lo contrario.
+You will receive an acknowledgment within a few days. As an open-source project maintained by an individual developer, there is no formal bug bounty program, but researchers will be credited in published advisories and release changelogs unless anonymity is requested.
 
-## Qué cuenta como vulnerabilidad
+## Scope & Vulnerability Definitions
 
-Sí:
+Eligible Security Issues:
 
-- Escapar de la carpeta personal (path traversal, enlaces simbólicos).
-- Ejecutar JavaScript en el origen de Martix (XSS) — la API local no pide
-  credenciales, así que equivale a controlar la aplicación.
-- Hacer que Martix borre o mueva algo que no debería, o que salte las rutas
-  protegidas.
-- Conseguir que Martix haga peticiones de red a destinos no locales (SSRF), o
-  que el contenido de un documento salga del equipo.
-- Colgar o tumbar el proceso con un archivo preparado (zip bomb, PDF hostil,
-  bomba de descompresión de imagen).
-- Ejecución de código a partir de un archivo descargado.
+- Path traversal or directory escape vulnerabilities (e.g. symbolic link bypasses).
+- Cross-Site Scripting (XSS) in the web UI—since local API requests run without token authentication by default, script execution under Martix's origin permits full local control.
+- Unauthorized file deletion, file relocation, or bypass of protected paths.
+- Server-Side Request Forgery (SSRF) or exfiltration of document content to remote network hosts.
+- Process crashes or denial of service induced by untrusted files (ZIP bombs, hostile PDFs, image decompression bombs).
+- Code execution vectors triggered by downloaded file ingestion.
 
-No, o solo si demuestras un impacto real:
+Non-Eligible Security Issues (unless demonstrating direct security impact):
 
-- **Que un proceso local pueda usar la API sin credencial.** Es un riesgo
-  conocido y aceptado de una aplicación local; la mitigación es `MARTIX_TOKEN`.
-  Está documentado en [docs/seguridad.md](docs/seguridad.md#4-riesgos-aceptados).
-- **Que el token se guarde en `localStorage`.** También conocido, aceptado y
-  mitigado por la Content-Security-Policy.
-- Un atacante que ya ejecuta código como tu usuario. En ese punto ya tiene tus
-  archivos y Martix es irrelevante.
-- Resultados de escáneres automáticos sin un camino de explotación.
+- Unauthenticated local access to the REST API from local processes. This is an explicit design trade-off for local desktop tools; binding outside loopback requires `MARTIX_TOKEN` authentication, as documented in [docs/security.md](docs/security.md#4-accepted-risks).
+- Storage of API tokens in `localStorage`. This trade-off is accepted and mitigated by a restrictive Content-Security-Policy (CSP).
+- Attacks assuming an adversary already holds arbitrary local shell access under the target user account.
+- Automated scanner outputs lacking a demonstrated, actionable exploitation path.
 
-## Cómo se verifica
+## Verification & Test Probes
 
-Cada defensa tiene una prueba que **ejecuta el ataque** contra la aplicación
-real, no que comprueba que exista una mitigación:
+Security mechanisms are verified by running active attack probes against live application components:
 
 ```bash
 cd backend
-.venv/bin/python tests/test_security.py    # sale con código 1 si algo es explotable
+.venv/bin/python tests/test_security.py    # Exits with status 1 if any vulnerability probe succeeds
 ```
 
-Se ejecuta en CI en cada push. Si envías un arreglo, añade también la sonda que
-reproduce el fallo.
+This test suite runs automatically in CI on every commit. When submitting security fixes, include a corresponding regression probe verifying the defense.
 
-El modelo de amenazas completo está en [docs/seguridad.md](docs/seguridad.md).
+The complete threat model and security specifications are documented in [docs/security.md](docs/security.md).
