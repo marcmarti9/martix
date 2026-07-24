@@ -38,7 +38,7 @@ Martix handles sensitive personal files (tax returns, bank statements, contracts
 * **Dynamic Placeholders:** Custom file renaming templates using tags like `{YYYY}`, `{Topic}`, `{ARTIST}`, `{ALBUM}`, `{EXIF_DATE}`, and `{OriginalName}`.
 
 ### 🛠️ Utilities & Desktop Experience
-* **📊 WizTree-Style Disk Space Visualizer:** Scan drives or folders to visualize space usage. Includes folder tree hierarchy (% of parent bars), file extension breakdown, and an interactive HTML5 Canvas treemap visualizer with 1-click file deletion.
+* **📊 Disk Space Visualizer:** Scan drives or folders to visualize space usage. Includes folder tree hierarchy (% of parent bars), file extension breakdown, and an interactive HTML5 Canvas squarified treemap visualizer with 1-click file deletion.
 * **⚡ 1-Click Installer & System Integration:** Run `./install.sh` to install Martix, register desktop app launchers, configure login autostart, enable background systemd services, and install the `martix` CLI terminal command.
 * **Fast 2-Step Deduplication:** Quickly detects duplicate files across any selected directory using a lightweight 2-pass hashing approach (64KB fast-hash + full SHA256 verification).
 * **Export & Import Rules:** Export your custom classification and maintenance rules to JSON files to share or backup.

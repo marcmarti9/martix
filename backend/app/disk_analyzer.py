@@ -1,5 +1,5 @@
-"""Analizador de uso de disco estilo WizTree para Martix.
-Escanea de forma ultra-rapida carpetas y directorios, calcula tamaños acumulados,
+"""Analizador de uso de disco para Martix.
+Escanea de forma ultra-rápida carpetas y directorios, calcula tamaños acumulados,
 conteo de archivos/carpetas, desglose por extensiones y datos para treemap visual.
 """
 

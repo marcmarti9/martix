@@ -1120,22 +1120,22 @@ input:checked + .slider:before {
 }
 
 /* ==========================================================================
-   WIZTREE DISK SPACE ANALYZER STYLES
+   DISK SPACE ANALYZER STYLES
    ========================================================================== */
-.btn-wiztree-accent {
+.btn-disk-analyzer-accent {
     background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
     color: #ffffff !important;
     border: 1px solid #3b82f6 !important;
     font-weight: 600;
 }
-.btn-wiztree-accent:hover {
+.btn-disk-analyzer-accent:hover {
     background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
     box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
 }
 
-.wiztree-fullscreen-dialog {
-    width: 96vw;
-    height: 94vh;
+.disk-analyzer-fullscreen-dialog {
+    width: 95vw;
+    height: 92vh;
     max-width: 1600px;
     max-height: 1000px;
     padding: 0;
@@ -1149,24 +1149,25 @@ input:checked + .slider:before {
     overflow: hidden;
 }
 
-#wiztree-header {
+#disk-analyzer-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
+    padding: 14px 24px;
     background: var(--bg-surface-elevated);
     border-bottom: 1px solid var(--border-color);
+    position: relative;
 }
 
-.wiztree-title-group {
+.disk-analyzer-title-group {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
 }
 
-.wiztree-logo-badge {
-    width: 38px;
-    height: 38px;
+.disk-analyzer-logo-badge {
+    width: 40px;
+    height: 40px;
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, #2563eb, #1d4ed8);
     display: flex;
@@ -1176,30 +1177,30 @@ input:checked + .slider:before {
     box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 
-.wiztree-logo-badge svg {
+.disk-analyzer-logo-badge svg {
     width: 22px;
     height: 22px;
 }
 
-.wiztree-title-group h2 {
-    font-size: 1.15rem;
+.disk-analyzer-title-group h2 {
+    font-size: 1.2rem;
     font-weight: 700;
     color: var(--color-text);
 }
 
-.wiztree-subtitle {
-    font-size: 0.76rem;
+.disk-analyzer-subtitle {
+    font-size: 0.78rem;
     color: var(--color-text-dim);
 }
 
-.wiztree-controls {
+.disk-analyzer-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
-.wiztree-select, .wiztree-input {
-    padding: 7px 12px;
+.disk-analyzer-select, .disk-analyzer-input {
+    padding: 8px 12px;
     background: var(--bg-app);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -1208,48 +1209,74 @@ input:checked + .slider:before {
     outline: none;
 }
 
-.wiztree-input {
-    width: 220px;
+.disk-analyzer-input {
+    width: 240px;
 }
 
-.wiztree-select:focus, .wiztree-input:focus {
+.disk-analyzer-select:focus, .disk-analyzer-input:focus {
     border-color: #3b82f6;
 }
 
-#wiztree-summary-bar {
+.btn-close-analyzer {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-surface-hover);
+    border: 1px solid var(--border-color);
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-left: 8px;
+}
+
+.btn-close-analyzer:hover {
+    background: #e81123;
+    color: #ffffff;
+    border-color: #e81123;
+}
+
+#disk-analyzer-summary-bar {
     display: flex;
     align-items: center;
     gap: 20px;
-    padding: 10px 20px;
+    padding: 10px 24px;
     background: var(--bg-app);
     border-bottom: 1px solid var(--border-color);
     font-size: 0.82rem;
 }
 
-.wiztree-stat-badge {
+.disk-analyzer-stat-badge {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.wiztree-stat-label {
+.disk-analyzer-stat-label {
     color: var(--color-text-dim);
     font-weight: 600;
 }
 
-.wiztree-stat-val {
+.disk-analyzer-stat-val {
     color: var(--color-text);
     font-weight: 700;
 }
 
-.wiztree-space-item {
+.disk-analyzer-space-item {
     display: flex;
     align-items: center;
     gap: 8px;
     flex: 1;
 }
 
-.wiztree-progress-bg {
+.disk-analyzer-progress-bg {
     flex: 1;
     height: 10px;
     background: var(--bg-surface-hover);
@@ -1258,49 +1285,45 @@ input:checked + .slider:before {
     position: relative;
 }
 
-.wiztree-progress-fill {
+.disk-analyzer-progress-fill {
     height: 100%;
     border-radius: var(--radius-full);
     transition: width 0.4s ease;
 }
 
-.wiztree-progress-fill.used {
+.disk-analyzer-progress-fill.used {
     background: linear-gradient(90deg, #3b82f6, #2563eb);
 }
 
-.wiztree-progress-fill.free {
+.disk-analyzer-progress-fill.free {
     background: linear-gradient(90deg, #10b981, #059669);
 }
 
-.wiztree-progress-fill.parent {
-    background: linear-gradient(90deg, #6366f1, #4f46e5);
-}
-
-#wiztree-workspace {
+#disk-analyzer-workspace {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px;
+    gap: 12px;
+    padding: 16px;
     background: var(--bg-app);
     overflow: hidden;
 }
 
-#wiztree-upper-panels {
+#disk-analyzer-upper-panels {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     height: 52%;
 }
 
-#wiztree-tree-panel {
+#disk-analyzer-tree-panel {
     flex: 1.4;
 }
 
-#wiztree-ext-panel {
+#disk-analyzer-ext-panel {
     flex: 1;
 }
 
-.wiztree-panel {
+.disk-analyzer-panel {
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -1309,16 +1332,16 @@ input:checked + .slider:before {
     overflow: hidden;
 }
 
-.wiztree-panel-header {
+.disk-analyzer-panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background: var(--bg-surface-elevated);
     border-bottom: 1px solid var(--border-color);
 }
 
-.wiztree-tab-title {
+.disk-analyzer-tab-title {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1327,74 +1350,74 @@ input:checked + .slider:before {
     color: var(--color-text);
 }
 
-.wiztree-tab-title svg {
+.disk-analyzer-tab-title svg {
     width: 16px;
     height: 16px;
     color: #3b82f6;
 }
 
-.wiztree-filter-input {
-    padding: 4px 8px;
+.disk-analyzer-filter-input {
+    padding: 5px 10px;
     background: var(--bg-app);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     color: var(--color-text);
     font-size: 0.78rem;
-    width: 160px;
+    width: 170px;
 }
 
-.wiztree-table-wrapper {
+.disk-analyzer-table-wrapper {
     flex: 1;
     overflow: auto;
 }
 
-.wiztree-table {
+.disk-analyzer-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.78rem;
     text-align: left;
 }
 
-.wiztree-table th {
+.disk-analyzer-table th {
     position: sticky;
     top: 0;
     background: var(--bg-surface-elevated);
     color: var(--color-text-muted);
     font-weight: 700;
-    padding: 6px 10px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border-color);
     z-index: 2;
     white-space: nowrap;
 }
 
-.wiztree-table td {
-    padding: 5px 10px;
+.disk-analyzer-table td {
+    padding: 6px 12px;
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.wiztree-table tbody tr {
+.disk-analyzer-table tbody tr {
     cursor: pointer;
     transition: background 0.1s ease;
 }
 
-.wiztree-table tbody tr:hover {
+.disk-analyzer-table tbody tr:hover {
     background: var(--bg-surface-hover);
 }
 
-.wiztree-table tbody tr.selected {
+.disk-analyzer-table tbody tr.selected {
     background: var(--bg-surface-active);
     outline: 1px solid #3b82f6;
 }
 
-.wiztree-tree-indent {
+.disk-analyzer-tree-indent {
     display: inline-block;
     width: 14px;
 }
 
-.wiztree-expander {
+.disk-analyzer-expander {
     display: inline-block;
     width: 14px;
     text-align: center;
@@ -1404,27 +1427,27 @@ input:checked + .slider:before {
     user-select: none;
 }
 
-.wiztree-cell-name {
+.disk-analyzer-cell-name {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.wiztree-icon-folder {
+.disk-analyzer-icon-folder {
     color: #f59e0b;
 }
 
-.wiztree-icon-file {
+.disk-analyzer-icon-file {
     color: #94a3b8;
 }
 
-.wiztree-bar-cell {
+.disk-analyzer-bar-cell {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.wiztree-bar-mini {
+.disk-analyzer-bar-mini {
     flex: 1;
     height: 8px;
     background: var(--bg-surface-hover);
@@ -1432,63 +1455,64 @@ input:checked + .slider:before {
     overflow: hidden;
 }
 
-.wiztree-bar-mini-fill {
+.disk-analyzer-bar-mini-fill {
     height: 100%;
     background: linear-gradient(90deg, #3b82f6, #6366f1);
     border-radius: 4px;
 }
 
-.wiztree-empty-cell {
+.disk-analyzer-empty-cell {
     text-align: center;
     color: var(--color-text-dim);
     padding: 30px !important;
 }
 
-#wiztree-bottom-panel {
+#disk-analyzer-bottom-panel {
     height: 48%;
 }
 
-.wiztree-hover-badge {
-    font-size: 0.76rem;
+.disk-analyzer-hover-badge {
+    font-size: 0.78rem;
     color: #3b82f6;
     font-weight: 600;
 }
 
-.wiztree-treemap-canvas-container {
+.disk-analyzer-treemap-canvas-container {
     flex: 1;
     position: relative;
     width: 100%;
     height: 100%;
-    background: var(--bg-app);
+    background: #121212;
+    border-radius: var(--radius-sm);
     overflow: hidden;
 }
 
-#wiztree-treemap-canvas {
+#disk-analyzer-treemap-canvas {
     width: 100%;
     height: 100%;
     display: block;
     cursor: crosshair;
 }
 
-#wiztree-footer {
+#disk-analyzer-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
+    padding: 12px 24px;
     background: var(--bg-surface-elevated);
     border-top: 1px solid var(--border-color);
 }
 
-.wiztree-footer-info {
-    font-size: 0.82rem;
+.disk-analyzer-footer-info {
+    font-size: 0.84rem;
     font-weight: 600;
     color: var(--color-text-muted);
 }
 
-.wiztree-footer-actions {
+.disk-analyzer-footer-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
 .btn-danger-accent {

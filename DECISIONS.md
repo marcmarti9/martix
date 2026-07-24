@@ -15,19 +15,19 @@ Este documento registra todas las decisiones de diseño, arquitectura y producto
 
 ---
 
-### [2026-07-24] — ADR-002: Visualizador de Espacio de Disco tipo WizTree
-* **Contexto:** Martix operaba principalmente en segundo plano organizando descargas. Se requería una funcionalidad visual potente para analizar y gestionar el almacenamiento en disco de forma interactiva (estilo WizTree).
+### [2026-07-24] — ADR-002: Visualizador de Espacio de Disco
+* **Contexto:** Martix operaba principalmente en segundo plano organizando descargas. Se requería una funcionalidad visual potente para analizar y gestionar el almacenamiento en disco de forma interactiva.
 * **Decisión:**
   1. **Motor de Análisis (`backend/app/disk_analyzer.py`):** Algoritmo de escaneo recursivo de alto rendimiento que calcula tamaños acumulados, porcentaje del directorio padre, recuento de carpetas/archivos y clasificación de tipos de archivo por extensiones.
   2. **API REST (`backend/app/server.py`):**
      - `GET /api/disk/drives`: Listado de unidades y carpetas clave.
      - `POST /api/disk/scan`: Escaneo de ruta arbitraria o carpeta predeterminada.
      - `POST /api/disk/delete`: Eliminación segura de archivos/carpetas directamente desde la vista de análisis.
-  3. **Interfaz de Usuario WizTree (`frontend/`):**
+  3. **Interfaz de Usuario del Analizador (`frontend/`):**
      - **Barra de Resumen de Disco:** Espacio total, usado (% y barra azul) y libre (% y barra verde), más tiempo de escaneo.
      - **Vista de Árbol (Panel Izquierdo):** Jerarquía de carpetas con expansión/colapso, barras de progreso de % respecto al padre, tamaños formateados (GB/MB), conteos de elementos y filtro de texto.
      - **Desglose por Extensión (Panel Derecho):** Tabla ordenada por ocupación de espacio según tipo de archivo/extensión con barras de color.
-     - **Treemap Interactivo (Panel Inferior):** Mapa visual dibujado en Canvas HTML5 con rectángulos de tamaño proporcional, información en hover y vinculación directa de selección con la vista de árbol.
+     - **Treemap Interactivo (Panel Inferior):** Mapa visual dibujado en Canvas HTML5 con algoritmo de división squarified, rectángulos de tamaño proporcional, información en hover y vinculación directa de selección con la vista de árbol.
 * **Consecuencias:** Martix evoluciona de un daemon pasivo a un explorador/analizador de espacio completo, permitiendo a los usuarios identificar y limpiar archivos pesados visualmente.
 
 ---

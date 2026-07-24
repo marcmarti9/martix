@@ -852,12 +852,12 @@ assert "extensions" in scan_res
 assert "treemap" in scan_res
 
 # Probamos eliminacion mediante /api/disk/delete
-dummy_del_file = downloads / "wiztree_del_test.tmp"
+dummy_del_file = downloads / "disk_del_test.tmp"
 dummy_del_file.write_text("para eliminar")
-r_del = client.post("/api/disk/delete", json={"path": "Downloads/wiztree_del_test.tmp"})
+r_del = client.post("/api/disk/delete", json={"path": "Downloads/disk_del_test.tmp"})
 assert r_del.status_code == 200, r_del.data
 assert not dummy_del_file.exists()
 
-print("OK analizador de espacio de disco WizTree (backend & endpoints)")
+print("OK analizador de espacio de disco (backend & endpoints)")
 
 print("\nTODAS LAS PRUEBAS PASARON")

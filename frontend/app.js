@@ -2015,43 +2015,49 @@ window.addEventListener("keydown", (e) => {
 });
 
 /* ==========================================================================
-   WIZTREE DISK SPACE ANALYZER MODULE
+   DISK SPACE ANALYZER MODULE
    ========================================================================== */
-let wiztreeData = null;
-let wiztreeSelectedItem = null;
+let diskAnalyzerData = null;
+let diskAnalyzerSelectedItem = null;
 let treemapRects = [];
 
-const wiztreeModal = document.getElementById("wiztree-modal");
-const btnWiztree = document.getElementById("btn-wiztree");
-const btnCloseWiztree = document.getElementById("btn-close-wiztree");
-const btnCloseWiztreeFooter = document.getElementById("btn-wiztree-close-footer");
-const btnWiztreeScan = document.getElementById("btn-wiztree-scan");
-const wiztreeDriveSelect = document.getElementById("wiztree-drive-select");
-const wiztreePathInput = document.getElementById("wiztree-path-input");
-const wiztreeTreeBody = document.getElementById("wiztree-tree-body");
-const wiztreeExtBody = document.getElementById("wiztree-ext-body");
-const wiztreeTreeFilter = document.getElementById("wiztree-tree-filter");
-const wiztreeCanvas = document.getElementById("wiztree-treemap-canvas");
-const wiztreeHoverInfo = document.getElementById("wiztree-selected-hover-info");
-const wiztreeFooterInfo = document.getElementById("wiztree-footer-info");
-const btnWiztreeDelete = document.getElementById("btn-wiztree-delete");
+const diskAnalyzerModal = document.getElementById("disk-analyzer-modal");
+const btnDiskAnalyzer = document.getElementById("btn-disk-analyzer");
+const btnCloseDiskAnalyzer = document.getElementById("btn-close-disk-analyzer");
+const btnCloseDiskAnalyzerFooter = document.getElementById("btn-disk-analyzer-close-footer");
+const btnDiskAnalyzerScan = document.getElementById("btn-disk-analyzer-scan");
+const diskAnalyzerDriveSelect = document.getElementById("disk-analyzer-drive-select");
+const diskAnalyzerPathInput = document.getElementById("disk-analyzer-path-input");
+const diskAnalyzerTreeBody = document.getElementById("disk-analyzer-tree-body");
+const diskAnalyzerExtBody = document.getElementById("disk-analyzer-ext-body");
+const diskAnalyzerTreeFilter = document.getElementById("disk-analyzer-tree-filter");
+const diskAnalyzerCanvas = document.getElementById("disk-analyzer-treemap-canvas");
+const diskAnalyzerHoverInfo = document.getElementById("disk-analyzer-selected-hover-info");
+const diskAnalyzerFooterInfo = document.getElementById("disk-analyzer-footer-info");
+const btnDiskAnalyzerDelete = document.getElementById("btn-disk-analyzer-delete");
 
-async function openWiztreeModal() {
-    if (!wiztreeModal) return;
-    wiztreeModal.showModal();
-    await loadWiztreeDrives();
-    runWiztreeScan();
+async function openDiskAnalyzerModal() {
+    if (!diskAnalyzerModal) return;
+    diskAnalyzerModal.showModal();
+    await loadDiskAnalyzerDrives();
+    runDiskAnalyzerScan();
 }
 
-async function loadWiztreeDrives() {
-    if (!wiztreeDriveSelect) return;
+function closeDiskAnalyzerModal() {
+    if (diskAnalyzerModal && diskAnalyzerModal.open) {
+        diskAnalyzerModal.close();
+    }
+}
+
+async function loadDiskAnalyzerDrives() {
+    if (!diskAnalyzerDriveSelect) return;
     try {
         const res = await fetch("/api/disk/drives", withToken());
         if (res.ok) {
             const drives = await res.json();
-            wiztreeDriveSelect.innerHTML = drives.map(d => `<option value="${escapeHtml(d.path)}">${escapeHtml(d.name)} (${escapeHtml(d.path)})</option>`).join("");
-            if (drives.length > 0 && wiztreePathInput && !wiztreePathInput.value) {
-                wiztreePathInput.value = drives[0].path;
+            diskAnalyzerDriveSelect.innerHTML = drives.map(d => `<option value="${escapeHtml(d.path)}">${escapeHtml(d.name)} (${escapeHtml(d.path)})</option>`).join("");
+            if (drives.length > 0 && diskAnalyzerPathInput && !diskAnalyzerPathInput.value) {
+                diskAnalyzerPathInput.value = drives[0].path;
             }
         }
     } catch (e) {
@@ -2059,19 +2065,19 @@ async function loadWiztreeDrives() {
     }
 }
 
-if (wiztreeDriveSelect) {
-    wiztreeDriveSelect.addEventListener("change", (e) => {
-        if (wiztreePathInput) wiztreePathInput.value = e.target.value;
-        runWiztreeScan();
+if (diskAnalyzerDriveSelect) {
+    diskAnalyzerDriveSelect.addEventListener("change", (e) => {
+        if (diskAnalyzerPathInput) diskAnalyzerPathInput.value = e.target.value;
+        runDiskAnalyzerScan();
     });
 }
 
-async function runWiztreeScan() {
-    const scanPath = (wiztreePathInput ? wiztreePathInput.value : "").trim();
-    const statusElem = document.getElementById("wiztree-scan-status");
+async function runDiskAnalyzerScan() {
+    const scanPath = (diskAnalyzerPathInput ? diskAnalyzerPathInput.value : "").trim();
+    const statusElem = document.getElementById("disk-analyzer-scan-status");
     if (statusElem) statusElem.textContent = "Escaneando disco...";
-    if (wiztreeTreeBody) wiztreeTreeBody.innerHTML = `<tr><td colspan="7" class="wiztree-empty-cell">Escaneando directorio de archivos... Por favor espera.</td></tr>`;
-    if (wiztreeExtBody) wiztreeExtBody.innerHTML = `<tr><td colspan="4" class="wiztree-empty-cell">Calculando desglose de extensiones...</td></tr>`;
+    if (diskAnalyzerTreeBody) diskAnalyzerTreeBody.innerHTML = `<tr><td colspan="7" class="disk-analyzer-empty-cell">Escaneando directorio de archivos... Por favor espera.</td></tr>`;
+    if (diskAnalyzerExtBody) diskAnalyzerExtBody.innerHTML = `<tr><td colspan="4" class="disk-analyzer-empty-cell">Calculando desglose de extensiones...</td></tr>`;
 
     try {
         const res = await fetch("/api/disk/scan", {
@@ -2086,40 +2092,40 @@ async function runWiztreeScan() {
             return;
         }
 
-        wiztreeData = await res.json();
-        renderWiztreeSummary();
-        renderWiztreeTree();
-        renderWiztreeExtensions();
-        renderWiztreeTreemap();
+        diskAnalyzerData = await res.json();
+        renderDiskAnalyzerSummary();
+        renderDiskAnalyzerTree();
+        renderDiskAnalyzerExtensions();
+        renderDiskAnalyzerTreemap();
     } catch (e) {
-        console.error("Error al ejecutar escaneo de WizTree:", e);
+        console.error("Error al ejecutar escaneo de espacio:", e);
         if (statusElem) statusElem.textContent = "Error al escanear";
     }
 }
 
-function renderWiztreeSummary() {
-    if (!wiztreeData) return;
-    const statusElem = document.getElementById("wiztree-scan-status");
-    if (statusElem) statusElem.textContent = `Escaneo completado en ${wiztreeData.scan_time_seconds} s`;
+function renderDiskAnalyzerSummary() {
+    if (!diskAnalyzerData) return;
+    const statusElem = document.getElementById("disk-analyzer-scan-status");
+    if (statusElem) statusElem.textContent = `Escaneo completado en ${diskAnalyzerData.scan_time_seconds} s`;
     
-    const totalSpaceElem = document.getElementById("wiztree-total-space");
-    if (totalSpaceElem) totalSpaceElem.textContent = wiztreeData.disk_info.total_space_formatted || "--";
+    const totalSpaceElem = document.getElementById("disk-analyzer-total-space");
+    if (totalSpaceElem) totalSpaceElem.textContent = diskAnalyzerData.disk_info.total_space_formatted || "--";
     
-    const usedSpaceElem = document.getElementById("wiztree-used-space");
-    if (usedSpaceElem) usedSpaceElem.textContent = `${wiztreeData.disk_info.used_space_formatted} (${wiztreeData.disk_info.used_percent}%)`;
-    const usedBar = document.getElementById("wiztree-used-bar");
-    if (usedBar) usedBar.style.width = `${wiztreeData.disk_info.used_percent}%`;
+    const usedSpaceElem = document.getElementById("disk-analyzer-used-space");
+    if (usedSpaceElem) usedSpaceElem.textContent = `${diskAnalyzerData.disk_info.used_space_formatted} (${diskAnalyzerData.disk_info.used_percent}%)`;
+    const usedBar = document.getElementById("disk-analyzer-used-bar");
+    if (usedBar) usedBar.style.width = `${diskAnalyzerData.disk_info.used_percent}%`;
 
-    const freeSpaceElem = document.getElementById("wiztree-free-space");
-    if (freeSpaceElem) freeSpaceElem.textContent = `${wiztreeData.disk_info.free_space_formatted} (${wiztreeData.disk_info.free_percent}%)`;
-    const freeBar = document.getElementById("wiztree-free-bar");
-    if (freeBar) freeBar.style.width = `${wiztreeData.disk_info.free_percent}%`;
+    const freeSpaceElem = document.getElementById("disk-analyzer-free-space");
+    if (freeSpaceElem) freeSpaceElem.textContent = `${diskAnalyzerData.disk_info.free_space_formatted} (${diskAnalyzerData.disk_info.free_percent}%)`;
+    const freeBar = document.getElementById("disk-analyzer-free-bar");
+    if (freeBar) freeBar.style.width = `${diskAnalyzerData.disk_info.free_percent}%`;
 }
 
-function renderWiztreeTree() {
-    if (!wiztreeData || !wiztreeData.tree || !wiztreeTreeBody) return;
-    const filterText = (wiztreeTreeFilter ? wiztreeTreeFilter.value : "").toLowerCase().trim();
-    wiztreeTreeBody.innerHTML = "";
+function renderDiskAnalyzerTree() {
+    if (!diskAnalyzerData || !diskAnalyzerData.tree || !diskAnalyzerTreeBody) return;
+    const filterText = (diskAnalyzerTreeFilter ? diskAnalyzerTreeFilter.value : "").toLowerCase().trim();
+    diskAnalyzerTreeBody.innerHTML = "";
 
     function renderNode(node, depth = 0) {
         if (filterText && !node.name.toLowerCase().includes(filterText)) {
@@ -2133,24 +2139,24 @@ function renderWiztreeTree() {
 
         const indentPx = depth * 16;
         const iconSvg = node.is_dir ?
-            `<svg class="wiztree-icon-folder" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>` :
-            `<svg class="wiztree-icon-file" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-5-7z"/></svg>`;
+            `<svg class="disk-analyzer-icon-folder" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>` :
+            `<svg class="disk-analyzer-icon-file" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-5-7z"/></svg>`;
 
         const expanderBtn = node.is_dir && node.children && node.children.length > 0 ?
-            `<span class="wiztree-expander">▼</span>` : `<span class="wiztree-tree-indent"></span>`;
+            `<span class="disk-analyzer-expander">▼</span>` : `<span class="disk-analyzer-tree-indent"></span>`;
 
         tr.innerHTML = `
             <td>
-                <div class="wiztree-cell-name" style="padding-left: ${indentPx}px">
+                <div class="disk-analyzer-cell-name" style="padding-left: ${indentPx}px">
                     ${expanderBtn}
                     ${iconSvg}
                     <span title="${escapeHtml(node.path)}">${escapeHtml(node.name)}</span>
                 </div>
             </td>
             <td>
-                <div class="wiztree-bar-cell">
-                    <div class="wiztree-bar-mini">
-                        <div class="wiztree-bar-mini-fill" style="width: ${node.percent_of_parent}%;"></div>
+                <div class="disk-analyzer-bar-cell">
+                    <div class="disk-analyzer-bar-mini">
+                        <div class="disk-analyzer-bar-mini-fill" style="width: ${node.percent_of_parent}%;"></div>
                     </div>
                     <span>${node.percent_of_parent}%</span>
                 </div>
@@ -2163,24 +2169,24 @@ function renderWiztreeTree() {
         `;
 
         tr.addEventListener("click", () => {
-            selectWiztreeItem(node);
-            document.querySelectorAll("#wiztree-tree-body tr").forEach(r => r.classList.remove("selected"));
+            selectDiskAnalyzerItem(node);
+            document.querySelectorAll("#disk-analyzer-tree-body tr").forEach(r => r.classList.remove("selected"));
             tr.classList.add("selected");
         });
 
-        wiztreeTreeBody.appendChild(tr);
+        diskAnalyzerTreeBody.appendChild(tr);
 
         if (depth < 2 && node.children) {
             node.children.forEach(child => renderNode(child, depth + 1));
         }
     }
 
-    renderNode(wiztreeData.tree, 0);
+    renderNode(diskAnalyzerData.tree, 0);
 }
 
-function renderWiztreeExtensions() {
-    if (!wiztreeData || !wiztreeData.extensions || !wiztreeExtBody) return;
-    wiztreeExtBody.innerHTML = wiztreeData.extensions.map(ext => `
+function renderDiskAnalyzerExtensions() {
+    if (!diskAnalyzerData || !diskAnalyzerData.extensions || !diskAnalyzerExtBody) return;
+    diskAnalyzerExtBody.innerHTML = diskAnalyzerData.extensions.map(ext => `
         <tr>
             <td>
                 <div style="display: flex; align-items: center; gap: 6px;">
@@ -2191,9 +2197,9 @@ function renderWiztreeExtensions() {
             <td>${escapeHtml(ext.type_name)}</td>
             <td><strong>${escapeHtml(ext.size_formatted)}</strong></td>
             <td>
-                <div class="wiztree-bar-cell">
-                    <div class="wiztree-bar-mini">
-                        <div class="wiztree-bar-mini-fill" style="width: ${ext.percent}%; background: ${ext.color};"></div>
+                <div class="disk-analyzer-bar-cell">
+                    <div class="disk-analyzer-bar-mini">
+                        <div class="disk-analyzer-bar-mini-fill" style="width: ${ext.percent}%; background: ${ext.color};"></div>
                     </div>
                     <span>${ext.percent}%</span>
                 </div>
@@ -2202,120 +2208,140 @@ function renderWiztreeExtensions() {
     `).join("");
 }
 
-function renderWiztreeTreemap() {
-    if (!wiztreeCanvas || !wiztreeData || !wiztreeData.treemap) return;
-    const container = wiztreeCanvas.parentElement;
+// ---- True Squarified Treemap Layout Engine ----
+function renderDiskAnalyzerTreemap() {
+    if (!diskAnalyzerCanvas || !diskAnalyzerData || !diskAnalyzerData.treemap) return;
+    const container = diskAnalyzerCanvas.parentElement;
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 300;
     
-    wiztreeCanvas.width = width;
-    wiztreeCanvas.height = height;
+    diskAnalyzerCanvas.width = width;
+    diskAnalyzerCanvas.height = height;
     
-    const ctx = wiztreeCanvas.getContext("2d");
+    const ctx = diskAnalyzerCanvas.getContext("2d");
     ctx.clearRect(0, 0, width, height);
 
     treemapRects = [];
-    const items = wiztreeData.treemap;
+    const items = diskAnalyzerData.treemap;
     if (items.length === 0) return;
 
-    function layoutTreemap(rectList, x, y, w, h) {
-        if (rectList.length === 0 || w <= 0 || h <= 0) return;
-        const totalSize = rectList.reduce((acc, item) => acc + item.size, 0);
-        if (totalSize <= 0) return;
+    const categoryColors = [
+        "#2563eb", "#3b82f6", "#0284c7", "#10b981", "#8b5cf6",
+        "#ec4899", "#f59e0b", "#06b6d4", "#64748b", "#e11d48"
+    ];
 
-        let curX = x;
-        let curY = y;
-        let remW = w;
-        let remH = h;
+    function getTileColor(item, index) {
+        if (item.color && item.color !== "#94a3b8") return item.color;
+        if (item.is_dir) return categoryColors[index % categoryColors.length];
+        return "#3b82f6";
+    }
 
-        let i = 0;
-        while (i < rectList.length && remW > 2 && remH > 2) {
-            const isHorizontal = remW > remH;
-            const item = rectList[i];
-            const ratio = item.size / totalSize;
-            
-            let itemW, itemH;
-            if (isHorizontal) {
-                itemW = Math.max(1, Math.min(remW, remW * ratio * 2));
-                itemH = remH;
-            } else {
-                itemW = remW;
-                itemH = Math.max(1, Math.min(remH, remH * ratio * 2));
-            }
+    function squarify(rects, x, y, w, h) {
+        if (rects.length === 0 || w <= 2 || h <= 2) return;
+        if (rects.length === 1) {
+            treemapRects.push({ x, y, w, h, item: rects[0] });
+            return;
+        }
 
-            treemapRects.push({
-                x: curX,
-                y: curY,
-                w: itemW,
-                h: itemH,
-                item: item
-            });
+        const total = rects.reduce((sum, r) => sum + r.size, 0);
+        if (total <= 0) return;
 
-            if (isHorizontal) {
-                curX += itemW;
-                remW -= itemW;
-            } else {
-                curY += itemH;
-                remH -= itemH;
-            }
-            i++;
+        let half = 0;
+        let splitIdx = 0;
+        for (let i = 0; i < rects.length; i++) {
+            half += rects[i].size;
+            splitIdx = i;
+            if (half >= total / 2) break;
+        }
+
+        const group1 = rects.slice(0, splitIdx + 1);
+        const group2 = rects.slice(splitIdx + 1);
+
+        const group1Size = group1.reduce((s, r) => s + r.size, 0);
+        const ratio = group1Size / total;
+
+        if (w >= h) {
+            const g1W = Math.round(w * ratio);
+            const g2W = w - g1W;
+            squarify(group1, x, y, g1W, h);
+            squarify(group2, x + g1W, y, g2W, h);
+        } else {
+            const g1H = Math.round(h * ratio);
+            const g2H = h - g1H;
+            squarify(group1, x, y, w, g1H);
+            squarify(group2, x, y + g1H, w, g2H);
         }
     }
 
-    layoutTreemap(items, 0, 0, width, height);
+    squarify(items, 0, 0, width, height);
 
-    treemapRects.forEach(r => {
-        ctx.fillStyle = r.item.color || "#3b82f6";
-        ctx.fillRect(r.x + 1, r.y + 1, Math.max(1, r.w - 2), Math.max(1, r.h - 2));
+    treemapRects.forEach((r, idx) => {
+        const gap = 2;
+        const rx = r.x + gap;
+        const ry = r.y + gap;
+        const rw = Math.max(1, r.w - gap * 2);
+        const rh = Math.max(1, r.h - gap * 2);
 
-        ctx.strokeStyle = "#181818";
+        const baseColor = getTileColor(r.item, idx);
+        
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(rx, ry, rw, rh, 4);
+        } else {
+            ctx.rect(rx, ry, rw, rh);
+        }
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
         ctx.lineWidth = 1;
-        ctx.strokeRect(r.x, r.y, r.w, r.h);
+        ctx.stroke();
 
-        if (r.w > 45 && r.h > 20) {
+        if (rw > 40 && rh > 18) {
             ctx.fillStyle = "#ffffff";
             ctx.font = "bold 11px sans-serif";
-            ctx.shadowColor = "rgba(0,0,0,0.8)";
-            ctx.shadowBlur = 3;
+            ctx.shadowColor = "rgba(0,0,0,0.85)";
+            ctx.shadowBlur = 4;
             
-            const maxChars = Math.floor(r.w / 7);
+            const maxChars = Math.floor(rw / 7);
             let nameStr = r.item.name;
-            if (nameStr.length > maxChars) nameStr = nameStr.substring(0, maxChars - 2) + "..";
+            if (nameStr.length > maxChars) nameStr = nameStr.substring(0, Math.max(2, maxChars - 2)) + "..";
             
-            ctx.fillText(nameStr, r.x + 4, r.y + 14);
+            ctx.fillText(nameStr, rx + 6, ry + 16);
 
-            if (r.h > 35 && r.w > 65) {
+            if (rh > 34 && rw > 60) {
                 ctx.font = "10px sans-serif";
-                ctx.fillText(r.item.size_formatted, r.x + 4, r.y + 27);
+                ctx.fillStyle = "rgba(255,255,255,0.85)";
+                ctx.fillText(r.item.size_formatted, rx + 6, ry + 28);
             }
             ctx.shadowBlur = 0;
         }
     });
 }
 
-if (wiztreeCanvas) {
-    wiztreeCanvas.addEventListener("mousemove", (e) => {
-        const rect = wiztreeCanvas.getBoundingClientRect();
+if (diskAnalyzerCanvas) {
+    diskAnalyzerCanvas.addEventListener("mousemove", (e) => {
+        const rect = diskAnalyzerCanvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
         const found = treemapRects.find(r => mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h);
-        if (found && wiztreeHoverInfo) {
-            wiztreeHoverInfo.textContent = `📍 ${found.item.name} (${found.item.size_formatted}) — ${found.item.path}`;
+        if (found && diskAnalyzerHoverInfo) {
+            diskAnalyzerHoverInfo.textContent = `📍 ${found.item.name} (${found.item.size_formatted}) — ${found.item.path}`;
         }
     });
 
-    wiztreeCanvas.addEventListener("click", (e) => {
-        const rect = wiztreeCanvas.getBoundingClientRect();
+    diskAnalyzerCanvas.addEventListener("click", (e) => {
+        const rect = diskAnalyzerCanvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
         const found = treemapRects.find(r => mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h);
         if (found) {
-            selectWiztreeItem(found.item);
-            const treeRow = document.querySelector(`#wiztree-tree-body tr[data-path="${CSS.escape(found.item.path)}"]`);
+            selectDiskAnalyzerItem(found.item);
+            const treeRow = document.querySelector(`#disk-analyzer-tree-body tr[data-path="${CSS.escape(found.item.path)}"]`);
             if (treeRow) {
-                document.querySelectorAll("#wiztree-tree-body tr").forEach(r => r.classList.remove("selected"));
+                document.querySelectorAll("#disk-analyzer-tree-body tr").forEach(r => r.classList.remove("selected"));
                 treeRow.classList.add("selected");
                 treeRow.scrollIntoView({ behavior: "smooth", block: "center" });
             }
@@ -2323,20 +2349,20 @@ if (wiztreeCanvas) {
     });
 }
 
-function selectWiztreeItem(item) {
-    wiztreeSelectedItem = item;
-    if (wiztreeFooterInfo) {
-        wiztreeFooterInfo.innerHTML = `<strong>Seleccionado:</strong> ${escapeHtml(item.name)} (${item.size_formatted || formatBytes(item.size)}) — <code>${escapeHtml(item.path)}</code>`;
+function selectDiskAnalyzerItem(item) {
+    diskAnalyzerSelectedItem = item;
+    if (diskAnalyzerFooterInfo) {
+        diskAnalyzerFooterInfo.innerHTML = `<strong>Seleccionado:</strong> ${escapeHtml(item.name)} (${item.size_formatted || formatBytes(item.size)}) — <code>${escapeHtml(item.path)}</code>`;
     }
-    if (btnWiztreeDelete) {
-        btnWiztreeDelete.disabled = false;
+    if (btnDiskAnalyzerDelete) {
+        btnDiskAnalyzerDelete.disabled = false;
     }
 }
 
-if (btnWiztreeDelete) {
-    btnWiztreeDelete.addEventListener("click", async () => {
-        if (!wiztreeSelectedItem) return;
-        const targetPath = wiztreeSelectedItem.path;
+if (btnDiskAnalyzerDelete) {
+    btnDiskAnalyzerDelete.addEventListener("click", async () => {
+        if (!diskAnalyzerSelectedItem) return;
+        const targetPath = diskAnalyzerSelectedItem.path;
         if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente:\n\n${targetPath}?`)) {
             return;
         }
@@ -2349,11 +2375,11 @@ if (btnWiztreeDelete) {
             });
 
             if (res.ok) {
-                showStatusMessage(`Elemento eliminado: ${wiztreeSelectedItem.name}`);
-                wiztreeSelectedItem = null;
-                btnWiztreeDelete.disabled = true;
-                if (wiztreeFooterInfo) wiztreeFooterInfo.textContent = "Ningún elemento seleccionado";
-                runWiztreeScan();
+                showStatusMessage(`Elemento eliminado: ${diskAnalyzerSelectedItem.name}`);
+                diskAnalyzerSelectedItem = null;
+                btnDiskAnalyzerDelete.disabled = true;
+                if (diskAnalyzerFooterInfo) diskAnalyzerFooterInfo.textContent = "Ningún elemento seleccionado";
+                runDiskAnalyzerScan();
             } else {
                 const err = await res.json();
                 alert(`Error al eliminar: ${err.error}`);
@@ -2364,11 +2390,11 @@ if (btnWiztreeDelete) {
     });
 }
 
-if (btnWiztree) btnWiztree.addEventListener("click", openWiztreeModal);
-if (btnCloseWiztree) btnCloseWiztree.addEventListener("click", () => wiztreeModal && wiztreeModal.close());
-if (btnCloseWiztreeFooter) btnCloseWiztreeFooter.addEventListener("click", () => wiztreeModal && wiztreeModal.close());
-if (btnWiztreeScan) btnWiztreeScan.addEventListener("click", runWiztreeScan);
-if (wiztreeTreeFilter) wiztreeTreeFilter.addEventListener("input", renderWiztreeTree);
+if (btnDiskAnalyzer) btnDiskAnalyzer.addEventListener("click", openDiskAnalyzerModal);
+if (btnCloseDiskAnalyzer) btnCloseDiskAnalyzer.addEventListener("click", closeDiskAnalyzerModal);
+if (btnCloseDiskAnalyzerFooter) btnCloseDiskAnalyzerFooter.addEventListener("click", closeDiskAnalyzerModal);
+if (btnDiskAnalyzerScan) btnDiskAnalyzerScan.addEventListener("click", runDiskAnalyzerScan);
+if (diskAnalyzerTreeFilter) diskAnalyzerTreeFilter.addEventListener("input", renderDiskAnalyzerTree);
 
 async function init() {
     applyLanguage();

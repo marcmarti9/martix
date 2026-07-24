@@ -52,9 +52,9 @@
                     <span data-i18n="simulate_btn">Simular (Prueba)</span>
                 </button>
 
-                <button type="button" id="btn-wiztree" class="btn btn-primary btn-wiztree-accent" title="Analizador de tamaño de archivos y carpetas tipo WizTree">
+                <button type="button" id="btn-disk-analyzer" class="btn btn-primary btn-disk-analyzer-accent" title="Analizador interactivo de tamaño de archivos y carpetas">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    <span>Espacio de Disco (WizTree)</span>
+                    <span>Analizador de Espacio</span>
                 </button>
 
                 <div class="toolbar-divider"></div>
@@ -221,73 +221,73 @@
         </div>
     </dialog>
 
-    <!-- WIZTREE DISK ANALYZER MODAL -->
-    <dialog id="wiztree-modal" class="modal-dialog wiztree-fullscreen-dialog">
-        <div id="wiztree-header">
-            <div class="wiztree-title-group">
-                <div class="wiztree-logo-badge">
+    <!-- DISK ANALYZER MODAL -->
+    <dialog id="disk-analyzer-modal" class="modal-dialog disk-analyzer-fullscreen-dialog">
+        <div id="disk-analyzer-header">
+            <div class="disk-analyzer-title-group">
+                <div class="disk-analyzer-logo-badge">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                 </div>
                 <div>
-                    <h2>WizTree — Analizador de Espacio de Disco</h2>
-                    <span class="wiztree-subtitle">Visualizador de tamaño de archivos, carpetas, extensiones y mapa treemap</span>
+                    <h2>Analizador de Espacio de Disco</h2>
+                    <span class="disk-analyzer-subtitle">Visualizador interactivo de carpetas, archivos, extensiones y mapa de bloques</span>
                 </div>
             </div>
 
-            <!-- Controls: Target path dropdown, input & scan button -->
-            <div class="wiztree-controls">
-                <select id="wiztree-drive-select" class="wiztree-select">
+            <!-- Controls: Target path dropdown, input, scan button & close button -->
+            <div class="disk-analyzer-controls">
+                <select id="disk-analyzer-drive-select" class="disk-analyzer-select">
                     <!-- Populated dynamically -->
                 </select>
-                <input type="text" id="wiztree-path-input" placeholder="Ruta a escanear (ej. Downloads, ~)" class="wiztree-input">
-                <button type="button" id="btn-wiztree-scan" class="btn btn-primary btn-wiztree-accent">
+                <input type="text" id="disk-analyzer-path-input" placeholder="Ruta a escanear (ej. Downloads, ~)" class="disk-analyzer-input">
+                <button type="button" id="btn-disk-analyzer-scan" class="btn btn-primary btn-disk-analyzer-accent">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <span>Escanear</span>
                 </button>
-                <button type="button" id="btn-close-wiztree" class="btn-close-modal" title="Cerrar">&times;</button>
+                <button type="button" id="btn-close-disk-analyzer" class="btn-close-modal btn-close-analyzer" title="Cerrar diálogo">&times;</button>
             </div>
         </div>
 
         <!-- Disk Space Overview Bar -->
-        <div id="wiztree-summary-bar">
-            <div class="wiztree-stat-badge">
-                <span class="wiztree-stat-label">Estado:</span>
-                <span id="wiztree-scan-status" class="wiztree-stat-val">Listo para escanear</span>
+        <div id="disk-analyzer-summary-bar">
+            <div class="disk-analyzer-stat-badge">
+                <span class="disk-analyzer-stat-label">Estado:</span>
+                <span id="disk-analyzer-scan-status" class="disk-analyzer-stat-val">Listo para escanear</span>
             </div>
-            <div class="wiztree-stat-badge">
-                <span class="wiztree-stat-label">Espacio Total:</span>
-                <span id="wiztree-total-space" class="wiztree-stat-val">--</span>
+            <div class="disk-analyzer-stat-badge">
+                <span class="disk-analyzer-stat-label">Espacio Total:</span>
+                <span id="disk-analyzer-total-space" class="disk-analyzer-stat-val">--</span>
             </div>
-            <div class="wiztree-space-item">
-                <span class="wiztree-stat-label">Espacio Usado:</span>
-                <span id="wiztree-used-space" class="wiztree-stat-val">--</span>
-                <div class="wiztree-progress-bg">
-                    <div id="wiztree-used-bar" class="wiztree-progress-fill used" style="width: 0%;"></div>
+            <div class="disk-analyzer-space-item">
+                <span class="disk-analyzer-stat-label">Espacio Usado:</span>
+                <span id="disk-analyzer-used-space" class="disk-analyzer-stat-val">--</span>
+                <div class="disk-analyzer-progress-bg">
+                    <div id="disk-analyzer-used-bar" class="disk-analyzer-progress-fill used" style="width: 0%;"></div>
                 </div>
             </div>
-            <div class="wiztree-space-item">
-                <span class="wiztree-stat-label">Espacio Libre:</span>
-                <span id="wiztree-free-space" class="wiztree-stat-val">--</span>
-                <div class="wiztree-progress-bg">
-                    <div id="wiztree-free-bar" class="wiztree-progress-fill free" style="width: 0%;"></div>
+            <div class="disk-analyzer-space-item">
+                <span class="disk-analyzer-stat-label">Espacio Libre:</span>
+                <span id="disk-analyzer-free-space" class="disk-analyzer-stat-val">--</span>
+                <div class="disk-analyzer-progress-bg">
+                    <div id="disk-analyzer-free-bar" class="disk-analyzer-progress-fill free" style="width: 0%;"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Main WizTree Split Workspace (Upper panels + Treemap bottom panel) -->
-        <div id="wiztree-workspace">
-            <div id="wiztree-upper-panels">
+        <!-- Main Workspace (Upper panels + Treemap bottom panel) -->
+        <div id="disk-analyzer-workspace">
+            <div id="disk-analyzer-upper-panels">
                 <!-- Left Panel: Tree View -->
-                <div id="wiztree-tree-panel" class="wiztree-panel">
-                    <div class="wiztree-panel-header">
-                        <div class="wiztree-tab-title">
+                <div id="disk-analyzer-tree-panel" class="disk-analyzer-panel">
+                    <div class="disk-analyzer-panel-header">
+                        <div class="disk-analyzer-tab-title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             <span>Vista de Árbol (Carpetas y Archivos)</span>
                         </div>
-                        <input type="text" id="wiztree-tree-filter" placeholder="Filtrar por nombre..." class="wiztree-filter-input">
+                        <input type="text" id="disk-analyzer-tree-filter" placeholder="Filtrar por nombre..." class="disk-analyzer-filter-input">
                     </div>
-                    <div class="wiztree-table-wrapper">
-                        <table class="wiztree-table" id="wiztree-tree-table">
+                    <div class="disk-analyzer-table-wrapper">
+                        <table class="disk-analyzer-table" id="disk-analyzer-tree-table">
                             <thead>
                                 <tr>
                                     <th style="width: 32%;">Carpeta / Archivo</th>
@@ -299,9 +299,9 @@
                                     <th style="width: 9%;">Modificado</th>
                                 </tr>
                             </thead>
-                            <tbody id="wiztree-tree-body">
+                            <tbody id="disk-analyzer-tree-body">
                                 <tr>
-                                    <td colspan="7" class="wiztree-empty-cell">Haz clic en "Escanear" para analizar la carpeta.</td>
+                                    <td colspan="7" class="disk-analyzer-empty-cell">Haz clic en "Escanear" para analizar la carpeta.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -309,15 +309,15 @@
                 </div>
 
                 <!-- Right Panel: Extension Breakdown -->
-                <div id="wiztree-ext-panel" class="wiztree-panel">
-                    <div class="wiztree-panel-header">
-                        <div class="wiztree-tab-title">
+                <div id="disk-analyzer-ext-panel" class="disk-analyzer-panel">
+                    <div class="disk-analyzer-panel-header">
+                        <div class="disk-analyzer-tab-title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             <span>Desglose por Extensión</span>
                         </div>
                     </div>
-                    <div class="wiztree-table-wrapper">
-                        <table class="wiztree-table" id="wiztree-ext-table">
+                    <div class="disk-analyzer-table-wrapper">
+                        <table class="disk-analyzer-table" id="disk-analyzer-ext-table">
                             <thead>
                                 <tr>
                                     <th style="width: 25%;">Extensión</th>
@@ -326,9 +326,9 @@
                                     <th style="width: 20%;">% del Total</th>
                                 </tr>
                             </thead>
-                            <tbody id="wiztree-ext-body">
+                            <tbody id="disk-analyzer-ext-body">
                                 <tr>
-                                    <td colspan="4" class="wiztree-empty-cell">Sin datos.</td>
+                                    <td colspan="4" class="disk-analyzer-empty-cell">Sin datos.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -337,31 +337,31 @@
             </div>
 
             <!-- Bottom Panel: Treemap Visualizer -->
-            <div id="wiztree-bottom-panel" class="wiztree-panel">
-                <div class="wiztree-panel-header">
-                    <div class="wiztree-tab-title">
+            <div id="disk-analyzer-bottom-panel" class="disk-analyzer-panel">
+                <div class="disk-analyzer-panel-header">
+                    <div class="disk-analyzer-tab-title">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                         <span>Mapa Treemap Visual (Bloques por Tamaño)</span>
                     </div>
-                    <div id="wiztree-selected-hover-info" class="wiztree-hover-badge">Pasa el cursor sobre un bloque o haz clic para seleccionar</div>
+                    <div id="disk-analyzer-selected-hover-info" class="disk-analyzer-hover-badge">Pasa el cursor sobre un bloque o haz clic para seleccionar</div>
                 </div>
-                <div id="wiztree-treemap-canvas-container" class="wiztree-treemap-canvas-container">
-                    <canvas id="wiztree-treemap-canvas"></canvas>
+                <div id="disk-analyzer-treemap-canvas-container" class="disk-analyzer-treemap-canvas-container">
+                    <canvas id="disk-analyzer-treemap-canvas"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- WizTree Footer Bar -->
-        <div id="wiztree-footer">
-            <div id="wiztree-footer-info" class="wiztree-footer-info">
+        <!-- Disk Analyzer Footer Bar -->
+        <div id="disk-analyzer-footer">
+            <div id="disk-analyzer-footer-info" class="disk-analyzer-footer-info">
                 Ningún elemento seleccionado
             </div>
-            <div class="wiztree-footer-actions">
-                <button type="button" id="btn-wiztree-delete" class="btn btn-secondary btn-danger-accent" disabled>
+            <div class="disk-analyzer-footer-actions">
+                <button type="button" id="btn-disk-analyzer-delete" class="btn btn-secondary btn-danger-accent" disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     <span>Eliminar Elemento</span>
                 </button>
-                <button type="button" id="btn-wiztree-close-footer" class="btn btn-primary">Cerrar</button>
+                <button type="button" id="btn-disk-analyzer-close-footer" class="btn btn-primary">Cerrar</button>
             </div>
         </div>
     </dialog>
