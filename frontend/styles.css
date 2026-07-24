@@ -1118,3 +1118,387 @@ input:checked + .slider:before {
     border-radius: var(--radius-md);
     font-size: 0.84rem;
 }
+
+/* ==========================================================================
+   WIZTREE DISK SPACE ANALYZER STYLES
+   ========================================================================== */
+.btn-wiztree-accent {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #ffffff !important;
+    border: 1px solid #3b82f6 !important;
+    font-weight: 600;
+}
+.btn-wiztree-accent:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.wiztree-fullscreen-dialog {
+    width: 96vw;
+    height: 94vh;
+    max-width: 1600px;
+    max-height: 1000px;
+    padding: 0;
+    margin: auto;
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color-hover);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#wiztree-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--bg-surface-elevated);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wiztree-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.wiztree-logo-badge {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.wiztree-logo-badge svg {
+    width: 22px;
+    height: 22px;
+}
+
+.wiztree-title-group h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.wiztree-subtitle {
+    font-size: 0.76rem;
+    color: var(--color-text-dim);
+}
+
+.wiztree-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.wiztree-select, .wiztree-input {
+    padding: 7px 12px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: 0.84rem;
+    outline: none;
+}
+
+.wiztree-input {
+    width: 220px;
+}
+
+.wiztree-select:focus, .wiztree-input:focus {
+    border-color: #3b82f6;
+}
+
+#wiztree-summary-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 20px;
+    background: var(--bg-app);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.82rem;
+}
+
+.wiztree-stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.wiztree-stat-label {
+    color: var(--color-text-dim);
+    font-weight: 600;
+}
+
+.wiztree-stat-val {
+    color: var(--color-text);
+    font-weight: 700;
+}
+
+.wiztree-space-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.wiztree-progress-bg {
+    flex: 1;
+    height: 10px;
+    background: var(--bg-surface-hover);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    position: relative;
+}
+
+.wiztree-progress-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.4s ease;
+}
+
+.wiztree-progress-fill.used {
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.wiztree-progress-fill.free {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.wiztree-progress-fill.parent {
+    background: linear-gradient(90deg, #6366f1, #4f46e5);
+}
+
+#wiztree-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    background: var(--bg-app);
+    overflow: hidden;
+}
+
+#wiztree-upper-panels {
+    display: flex;
+    gap: 10px;
+    height: 52%;
+}
+
+#wiztree-tree-panel {
+    flex: 1.4;
+}
+
+#wiztree-ext-panel {
+    flex: 1;
+}
+
+.wiztree-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.wiztree-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-surface-elevated);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wiztree-tab-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.wiztree-tab-title svg {
+    width: 16px;
+    height: 16px;
+    color: #3b82f6;
+}
+
+.wiztree-filter-input {
+    padding: 4px 8px;
+    background: var(--bg-app);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 0.78rem;
+    width: 160px;
+}
+
+.wiztree-table-wrapper {
+    flex: 1;
+    overflow: auto;
+}
+
+.wiztree-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    text-align: left;
+}
+
+.wiztree-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-surface-elevated);
+    color: var(--color-text-muted);
+    font-weight: 700;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-color);
+    z-index: 2;
+    white-space: nowrap;
+}
+
+.wiztree-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.wiztree-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.wiztree-table tbody tr:hover {
+    background: var(--bg-surface-hover);
+}
+
+.wiztree-table tbody tr.selected {
+    background: var(--bg-surface-active);
+    outline: 1px solid #3b82f6;
+}
+
+.wiztree-tree-indent {
+    display: inline-block;
+    width: 14px;
+}
+
+.wiztree-expander {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    user-select: none;
+}
+
+.wiztree-cell-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.wiztree-icon-folder {
+    color: #f59e0b;
+}
+
+.wiztree-icon-file {
+    color: #94a3b8;
+}
+
+.wiztree-bar-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wiztree-bar-mini {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-surface-hover);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.wiztree-bar-mini-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #6366f1);
+    border-radius: 4px;
+}
+
+.wiztree-empty-cell {
+    text-align: center;
+    color: var(--color-text-dim);
+    padding: 30px !important;
+}
+
+#wiztree-bottom-panel {
+    height: 48%;
+}
+
+.wiztree-hover-badge {
+    font-size: 0.76rem;
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.wiztree-treemap-canvas-container {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-app);
+    overflow: hidden;
+}
+
+#wiztree-treemap-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+}
+
+#wiztree-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg-surface-elevated);
+    border-top: 1px solid var(--border-color);
+}
+
+.wiztree-footer-info {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.wiztree-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-danger-accent {
+    background: rgba(232, 17, 35, 0.15) !important;
+    color: #e81123 !important;
+    border: 1px solid rgba(232, 17, 35, 0.4) !important;
+}
+
+.btn-danger-accent:hover:not(:disabled) {
+    background: #e81123 !important;
+    color: #ffffff !important;
+}
+

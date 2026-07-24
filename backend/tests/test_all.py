@@ -835,6 +835,29 @@ print("OK proteccion de descargas temporales y archivos de 0 bytes")
 if img_test.exists(): img_test.unlink()
 if mp3_test.exists(): mp3_test.unlink()
 
+# ---- Pruebas del Analizador WizTree (/api/disk/drives, /api/disk/scan, /api/disk/delete) ----
+r_drives = client.get("/api/disk/drives")
+assert r_drives.status_code == 200, r_drives.data
+drives_data = r_drives.get_json()
+assert isinstance(drives_data, list)
+assert len(drives_data) >= 1
+
+# Probamos scan de la carpeta Downloads
+r_scan = client.post("/api/disk/scan", json={"path": "Downloads"})
+assert r_scan.status_code == 200, r_scan.data
+scan_res = r_scan.get_json()
+assert "disk_info" in scan_res
+assert "tree" in scan_res
+assert "extensions" in scan_res
+assert "treemap" in scan_res
+
+# Probamos eliminacion mediante /api/disk/delete
+dummy_del_file = downloads / "wiztree_del_test.tmp"
+dummy_del_file.write_text("para eliminar")
+r_del = client.post("/api/disk/delete", json={"path": "Downloads/wiztree_del_test.tmp"})
+assert r_del.status_code == 200, r_del.data
+assert not dummy_del_file.exists()
+
+print("OK analizador de espacio de disco WizTree (backend & endpoints)")
+
 print("\nTODAS LAS PRUEBAS PASARON")
-
-

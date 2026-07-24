@@ -2014,6 +2014,362 @@ window.addEventListener("keydown", (e) => {
     }
 });
 
+/* ==========================================================================
+   WIZTREE DISK SPACE ANALYZER MODULE
+   ========================================================================== */
+let wiztreeData = null;
+let wiztreeSelectedItem = null;
+let treemapRects = [];
+
+const wiztreeModal = document.getElementById("wiztree-modal");
+const btnWiztree = document.getElementById("btn-wiztree");
+const btnCloseWiztree = document.getElementById("btn-close-wiztree");
+const btnCloseWiztreeFooter = document.getElementById("btn-wiztree-close-footer");
+const btnWiztreeScan = document.getElementById("btn-wiztree-scan");
+const wiztreeDriveSelect = document.getElementById("wiztree-drive-select");
+const wiztreePathInput = document.getElementById("wiztree-path-input");
+const wiztreeTreeBody = document.getElementById("wiztree-tree-body");
+const wiztreeExtBody = document.getElementById("wiztree-ext-body");
+const wiztreeTreeFilter = document.getElementById("wiztree-tree-filter");
+const wiztreeCanvas = document.getElementById("wiztree-treemap-canvas");
+const wiztreeHoverInfo = document.getElementById("wiztree-selected-hover-info");
+const wiztreeFooterInfo = document.getElementById("wiztree-footer-info");
+const btnWiztreeDelete = document.getElementById("btn-wiztree-delete");
+
+async function openWiztreeModal() {
+    if (!wiztreeModal) return;
+    wiztreeModal.showModal();
+    await loadWiztreeDrives();
+    runWiztreeScan();
+}
+
+async function loadWiztreeDrives() {
+    if (!wiztreeDriveSelect) return;
+    try {
+        const res = await fetch("/api/disk/drives", withToken());
+        if (res.ok) {
+            const drives = await res.json();
+            wiztreeDriveSelect.innerHTML = drives.map(d => `<option value="${escapeHtml(d.path)}">${escapeHtml(d.name)} (${escapeHtml(d.path)})</option>`).join("");
+            if (drives.length > 0 && wiztreePathInput && !wiztreePathInput.value) {
+                wiztreePathInput.value = drives[0].path;
+            }
+        }
+    } catch (e) {
+        console.error("Error cargando unidades:", e);
+    }
+}
+
+if (wiztreeDriveSelect) {
+    wiztreeDriveSelect.addEventListener("change", (e) => {
+        if (wiztreePathInput) wiztreePathInput.value = e.target.value;
+        runWiztreeScan();
+    });
+}
+
+async function runWiztreeScan() {
+    const scanPath = (wiztreePathInput ? wiztreePathInput.value : "").trim();
+    const statusElem = document.getElementById("wiztree-scan-status");
+    if (statusElem) statusElem.textContent = "Escaneando disco...";
+    if (wiztreeTreeBody) wiztreeTreeBody.innerHTML = `<tr><td colspan="7" class="wiztree-empty-cell">Escaneando directorio de archivos... Por favor espera.</td></tr>`;
+    if (wiztreeExtBody) wiztreeExtBody.innerHTML = `<tr><td colspan="4" class="wiztree-empty-cell">Calculando desglose de extensiones...</td></tr>`;
+
+    try {
+        const res = await fetch("/api/disk/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: scanPath })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            if (statusElem) statusElem.textContent = `Error: ${err.error || "Fallo al escanear"}`;
+            return;
+        }
+
+        wiztreeData = await res.json();
+        renderWiztreeSummary();
+        renderWiztreeTree();
+        renderWiztreeExtensions();
+        renderWiztreeTreemap();
+    } catch (e) {
+        console.error("Error al ejecutar escaneo de WizTree:", e);
+        if (statusElem) statusElem.textContent = "Error al escanear";
+    }
+}
+
+function renderWiztreeSummary() {
+    if (!wiztreeData) return;
+    const statusElem = document.getElementById("wiztree-scan-status");
+    if (statusElem) statusElem.textContent = `Escaneo completado en ${wiztreeData.scan_time_seconds} s`;
+    
+    const totalSpaceElem = document.getElementById("wiztree-total-space");
+    if (totalSpaceElem) totalSpaceElem.textContent = wiztreeData.disk_info.total_space_formatted || "--";
+    
+    const usedSpaceElem = document.getElementById("wiztree-used-space");
+    if (usedSpaceElem) usedSpaceElem.textContent = `${wiztreeData.disk_info.used_space_formatted} (${wiztreeData.disk_info.used_percent}%)`;
+    const usedBar = document.getElementById("wiztree-used-bar");
+    if (usedBar) usedBar.style.width = `${wiztreeData.disk_info.used_percent}%`;
+
+    const freeSpaceElem = document.getElementById("wiztree-free-space");
+    if (freeSpaceElem) freeSpaceElem.textContent = `${wiztreeData.disk_info.free_space_formatted} (${wiztreeData.disk_info.free_percent}%)`;
+    const freeBar = document.getElementById("wiztree-free-bar");
+    if (freeBar) freeBar.style.width = `${wiztreeData.disk_info.free_percent}%`;
+}
+
+function renderWiztreeTree() {
+    if (!wiztreeData || !wiztreeData.tree || !wiztreeTreeBody) return;
+    const filterText = (wiztreeTreeFilter ? wiztreeTreeFilter.value : "").toLowerCase().trim();
+    wiztreeTreeBody.innerHTML = "";
+
+    function renderNode(node, depth = 0) {
+        if (filterText && !node.name.toLowerCase().includes(filterText)) {
+            const childMatch = (node.children || []).some(c => c.name.toLowerCase().includes(filterText));
+            if (!childMatch) return;
+        }
+
+        const tr = document.createElement("tr");
+        tr.dataset.path = node.path;
+        tr.dataset.isDir = node.is_dir ? "true" : "false";
+
+        const indentPx = depth * 16;
+        const iconSvg = node.is_dir ?
+            `<svg class="wiztree-icon-folder" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/></svg>` :
+            `<svg class="wiztree-icon-file" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-5-7z"/></svg>`;
+
+        const expanderBtn = node.is_dir && node.children && node.children.length > 0 ?
+            `<span class="wiztree-expander">▼</span>` : `<span class="wiztree-tree-indent"></span>`;
+
+        tr.innerHTML = `
+            <td>
+                <div class="wiztree-cell-name" style="padding-left: ${indentPx}px">
+                    ${expanderBtn}
+                    ${iconSvg}
+                    <span title="${escapeHtml(node.path)}">${escapeHtml(node.name)}</span>
+                </div>
+            </td>
+            <td>
+                <div class="wiztree-bar-cell">
+                    <div class="wiztree-bar-mini">
+                        <div class="wiztree-bar-mini-fill" style="width: ${node.percent_of_parent}%;"></div>
+                    </div>
+                    <span>${node.percent_of_parent}%</span>
+                </div>
+            </td>
+            <td><strong>${escapeHtml(node.size_formatted)}</strong></td>
+            <td>${node.items_count !== undefined ? node.items_count.toLocaleString() : "--"}</td>
+            <td>${node.files_count !== undefined ? node.files_count.toLocaleString() : "--"}</td>
+            <td>${node.folders_count !== undefined ? node.folders_count.toLocaleString() : "--"}</td>
+            <td>${escapeHtml(node.mtime || "--")}</td>
+        `;
+
+        tr.addEventListener("click", () => {
+            selectWiztreeItem(node);
+            document.querySelectorAll("#wiztree-tree-body tr").forEach(r => r.classList.remove("selected"));
+            tr.classList.add("selected");
+        });
+
+        wiztreeTreeBody.appendChild(tr);
+
+        if (depth < 2 && node.children) {
+            node.children.forEach(child => renderNode(child, depth + 1));
+        }
+    }
+
+    renderNode(wiztreeData.tree, 0);
+}
+
+function renderWiztreeExtensions() {
+    if (!wiztreeData || !wiztreeData.extensions || !wiztreeExtBody) return;
+    wiztreeExtBody.innerHTML = wiztreeData.extensions.map(ext => `
+        <tr>
+            <td>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: ${ext.color}; display: inline-block;"></span>
+                    <strong>${escapeHtml(ext.extension)}</strong>
+                </div>
+            </td>
+            <td>${escapeHtml(ext.type_name)}</td>
+            <td><strong>${escapeHtml(ext.size_formatted)}</strong></td>
+            <td>
+                <div class="wiztree-bar-cell">
+                    <div class="wiztree-bar-mini">
+                        <div class="wiztree-bar-mini-fill" style="width: ${ext.percent}%; background: ${ext.color};"></div>
+                    </div>
+                    <span>${ext.percent}%</span>
+                </div>
+            </td>
+        </tr>
+    `).join("");
+}
+
+function renderWiztreeTreemap() {
+    if (!wiztreeCanvas || !wiztreeData || !wiztreeData.treemap) return;
+    const container = wiztreeCanvas.parentElement;
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 300;
+    
+    wiztreeCanvas.width = width;
+    wiztreeCanvas.height = height;
+    
+    const ctx = wiztreeCanvas.getContext("2d");
+    ctx.clearRect(0, 0, width, height);
+
+    treemapRects = [];
+    const items = wiztreeData.treemap;
+    if (items.length === 0) return;
+
+    function layoutTreemap(rectList, x, y, w, h) {
+        if (rectList.length === 0 || w <= 0 || h <= 0) return;
+        const totalSize = rectList.reduce((acc, item) => acc + item.size, 0);
+        if (totalSize <= 0) return;
+
+        let curX = x;
+        let curY = y;
+        let remW = w;
+        let remH = h;
+
+        let i = 0;
+        while (i < rectList.length && remW > 2 && remH > 2) {
+            const isHorizontal = remW > remH;
+            const item = rectList[i];
+            const ratio = item.size / totalSize;
+            
+            let itemW, itemH;
+            if (isHorizontal) {
+                itemW = Math.max(1, Math.min(remW, remW * ratio * 2));
+                itemH = remH;
+            } else {
+                itemW = remW;
+                itemH = Math.max(1, Math.min(remH, remH * ratio * 2));
+            }
+
+            treemapRects.push({
+                x: curX,
+                y: curY,
+                w: itemW,
+                h: itemH,
+                item: item
+            });
+
+            if (isHorizontal) {
+                curX += itemW;
+                remW -= itemW;
+            } else {
+                curY += itemH;
+                remH -= itemH;
+            }
+            i++;
+        }
+    }
+
+    layoutTreemap(items, 0, 0, width, height);
+
+    treemapRects.forEach(r => {
+        ctx.fillStyle = r.item.color || "#3b82f6";
+        ctx.fillRect(r.x + 1, r.y + 1, Math.max(1, r.w - 2), Math.max(1, r.h - 2));
+
+        ctx.strokeStyle = "#181818";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(r.x, r.y, r.w, r.h);
+
+        if (r.w > 45 && r.h > 20) {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 11px sans-serif";
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+            ctx.shadowBlur = 3;
+            
+            const maxChars = Math.floor(r.w / 7);
+            let nameStr = r.item.name;
+            if (nameStr.length > maxChars) nameStr = nameStr.substring(0, maxChars - 2) + "..";
+            
+            ctx.fillText(nameStr, r.x + 4, r.y + 14);
+
+            if (r.h > 35 && r.w > 65) {
+                ctx.font = "10px sans-serif";
+                ctx.fillText(r.item.size_formatted, r.x + 4, r.y + 27);
+            }
+            ctx.shadowBlur = 0;
+        }
+    });
+}
+
+if (wiztreeCanvas) {
+    wiztreeCanvas.addEventListener("mousemove", (e) => {
+        const rect = wiztreeCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const found = treemapRects.find(r => mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h);
+        if (found && wiztreeHoverInfo) {
+            wiztreeHoverInfo.textContent = `📍 ${found.item.name} (${found.item.size_formatted}) — ${found.item.path}`;
+        }
+    });
+
+    wiztreeCanvas.addEventListener("click", (e) => {
+        const rect = wiztreeCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const found = treemapRects.find(r => mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h);
+        if (found) {
+            selectWiztreeItem(found.item);
+            const treeRow = document.querySelector(`#wiztree-tree-body tr[data-path="${CSS.escape(found.item.path)}"]`);
+            if (treeRow) {
+                document.querySelectorAll("#wiztree-tree-body tr").forEach(r => r.classList.remove("selected"));
+                treeRow.classList.add("selected");
+                treeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+    });
+}
+
+function selectWiztreeItem(item) {
+    wiztreeSelectedItem = item;
+    if (wiztreeFooterInfo) {
+        wiztreeFooterInfo.innerHTML = `<strong>Seleccionado:</strong> ${escapeHtml(item.name)} (${item.size_formatted || formatBytes(item.size)}) — <code>${escapeHtml(item.path)}</code>`;
+    }
+    if (btnWiztreeDelete) {
+        btnWiztreeDelete.disabled = false;
+    }
+}
+
+if (btnWiztreeDelete) {
+    btnWiztreeDelete.addEventListener("click", async () => {
+        if (!wiztreeSelectedItem) return;
+        const targetPath = wiztreeSelectedItem.path;
+        if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente:\n\n${targetPath}?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/disk/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path: targetPath })
+            });
+
+            if (res.ok) {
+                showStatusMessage(`Elemento eliminado: ${wiztreeSelectedItem.name}`);
+                wiztreeSelectedItem = null;
+                btnWiztreeDelete.disabled = true;
+                if (wiztreeFooterInfo) wiztreeFooterInfo.textContent = "Ningún elemento seleccionado";
+                runWiztreeScan();
+            } else {
+                const err = await res.json();
+                alert(`Error al eliminar: ${err.error}`);
+            }
+        } catch (e) {
+            alert(`Error de red al eliminar: ${e}`);
+        }
+    });
+}
+
+if (btnWiztree) btnWiztree.addEventListener("click", openWiztreeModal);
+if (btnCloseWiztree) btnCloseWiztree.addEventListener("click", () => wiztreeModal && wiztreeModal.close());
+if (btnCloseWiztreeFooter) btnCloseWiztreeFooter.addEventListener("click", () => wiztreeModal && wiztreeModal.close());
+if (btnWiztreeScan) btnWiztreeScan.addEventListener("click", runWiztreeScan);
+if (wiztreeTreeFilter) wiztreeTreeFilter.addEventListener("input", renderWiztreeTree);
+
 async function init() {
     applyLanguage();
     updateThemeButton();
@@ -2043,3 +2399,4 @@ async function init() {
 }
 
 init();
+

@@ -38,6 +38,8 @@ Martix handles sensitive personal files (tax returns, bank statements, contracts
 * **Dynamic Placeholders:** Custom file renaming templates using tags like `{YYYY}`, `{Topic}`, `{ARTIST}`, `{ALBUM}`, `{EXIF_DATE}`, and `{OriginalName}`.
 
 ### 🛠️ Utilities & Desktop Experience
+* **📊 WizTree-Style Disk Space Visualizer:** Scan drives or folders to visualize space usage. Includes folder tree hierarchy (% of parent bars), file extension breakdown, and an interactive HTML5 Canvas treemap visualizer with 1-click file deletion.
+* **⚡ 1-Click Installer & System Integration:** Run `./install.sh` to install Martix, register desktop app launchers, configure login autostart, enable background systemd services, and install the `martix` CLI terminal command.
 * **Fast 2-Step Deduplication:** Quickly detects duplicate files across any selected directory using a lightweight 2-pass hashing approach (64KB fast-hash + full SHA256 verification).
 * **Export & Import Rules:** Export your custom classification and maintenance rules to JSON files to share or backup.
 * **Dry-Run Simulation:** Test how your rules will handle existing files before committing any actual moves.
@@ -53,17 +55,25 @@ Martix handles sensitive personal files (tax returns, bank statements, contracts
 * (Optional) **Tesseract OCR** for image text scanning.
 * (Optional) **Ollama** (`MARTIX_LLM=1`) for local AI fallback suggestions.
 
-### Quick Run
+### ⚡ 1-Click Installation & Desktop Integration
 ```bash
 git clone https://github.com/marcmarti9/martix.git
+cd martix
+./install.sh
+```
+This automatically sets up Python dependencies, registers the desktop app launcher, configures auto-start on login, enables the background service, and installs the `martix` CLI command.
+
+To uninstall at any time:
+```bash
+./uninstall.sh
+```
+
+### Quick Manual Run
+```bash
 cd martix/backend
-
-# Create environment and install dependencies
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Run server
 python main.py
 ```
 Open your browser at `http://127.0.0.1:5000` to access the dashboard.
@@ -154,7 +164,19 @@ frontend/
 ├── index.html             # Web dashboard template
 ├── app.js                 # Dashboard UI logic, rule builder, duplicate tool, i18n
 └── styles.css             # Responsive styling & themes
+├── install.sh              # 1-Click installer wrapper
+├── uninstall.sh            # 1-Click uninstaller wrapper
+├── installer.py            # Unified cross-platform installer script
+├── uninstaller.py          # Unified cross-platform uninstaller script
+├── DECISIONS.md            # Architecture Decision Records (ADR)
+├── ROADMAP.md              # Project status & backlog
 ```
+
+---
+
+## 📜 Architecture Decisions
+
+All major design and architectural decisions (ADRs) are documented in [DECISIONS.md](DECISIONS.md).
 
 ---
 

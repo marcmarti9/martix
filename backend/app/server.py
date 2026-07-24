@@ -643,6 +643,47 @@ def create_app() -> Flask:
         deleted = run_maintenance_cleanup()
         return jsonify({"success": True, "deleted": len(deleted), "items": deleted}), 200
 
+    @app.get("/api/disk/drives")
+    def get_disk_drives():
+        from app.disk_analyzer import get_available_drives
+        return jsonify(get_available_drives())
+
+    @app.post("/api/disk/scan")
+    def scan_disk():
+        from app.disk_analyzer import scan_disk_usage
+        payload = request.get_json(silent=True) or {}
+        raw_path = payload.get("path")
+        target_path = browser.resolve_safe_path(raw_path) if raw_path else DOWNLOADS_DIR
+        if target_path is None or not target_path.exists():
+            return jsonify({"error": "Ruta no permitida o no existe"}), 400
+        try:
+            res = scan_disk_usage(target_path)
+            return jsonify(res)
+        except Exception as e:
+            logger.exception("Error escaneando disco: %s", e)
+            return jsonify({"error": f"Error al escanear disco: {e}"}), 500
+
+    @app.post("/api/disk/delete")
+    def delete_disk_item():
+        payload = request.get_json(silent=True) or {}
+        raw_path = payload.get("path")
+        if not raw_path:
+            return jsonify({"error": "Ruta obligatoria"}), 400
+        resolved = browser.resolve_safe_path(raw_path)
+        if resolved is None or not resolved.exists():
+            return jsonify({"error": "Ruta invalida o no permitida"}), 400
+        try:
+            if resolved.is_file():
+                resolved.unlink()
+            elif resolved.is_dir():
+                import shutil
+                shutil.rmtree(resolved)
+            return jsonify({"success": True, "deleted": str(raw_path)})
+        except Exception as e:
+            logger.exception("Error al eliminar elemento del disco: %s", e)
+            return jsonify({"error": f"No se pudo eliminar: {e}"}), 500
+
+
     # Ejecucion del mantenimiento al iniciar el servidor
     import threading
     def start_background_maintenance():
