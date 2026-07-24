@@ -87,6 +87,26 @@ def create_app() -> Flask:
             response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+
+        # Segunda linea de defensa frente a XSS: aunque un dia se cuele una
+        # inyeccion en el DOM, no podra cargar scripts remotos ni exfiltrar
+        # nada, porque solo se permite el propio origen y no hay destinos de
+        # red externos. La interfaz es 100% local (sin CDNs), asi que esta
+        # politica no rompe nada.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self'; "
+            "form-action 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none'; "
+            "object-src 'none'"
+        )
+        # Redundante con frame-ancestors para navegadores antiguos.
+        response.headers["X-Frame-Options"] = "DENY"
         return response
 
     @app.errorhandler(Exception)
@@ -386,6 +406,10 @@ def create_app() -> Flask:
         resolved = browser.resolve_safe_path(raw_path)
         if resolved is None:
             return jsonify({"error": "ruta no permitida"}), 400
+        # No se puede entrar en carpetas protegidas (~/.ssh, ~/.config...):
+        # sus nombres de archivo ya son informacion util para un atacante.
+        if security.is_protected_path(resolved):
+            return jsonify({"error": "carpeta protegida: Martix no muestra su contenido"}), 403
         if not resolved.exists():
             return jsonify({"path": raw_path, "exists": False, "entries": []})
         if not resolved.is_dir():
@@ -440,9 +464,16 @@ def create_app() -> Flask:
         url = (payload.get("url") or "").strip() or llm_settings.LLM_URL
         model = (payload.get("model") or "").strip() or llm_settings.LLM_MODEL
 
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            return jsonify({"ok": False, "error": "URL invalida"}), 400
+        # Anti-SSRF: este endpoint hace una peticion HTTP desde el servidor con
+        # la URL que le pasen. Sin restringirlo a loopback, cualquiera con
+        # acceso a la API puede usar Martix para sondear puertos de localhost y
+        # de la red local y leer las respuestas.
+        if not security.is_loopback_url(url):
+            return jsonify({
+                "ok": False,
+                "error": "solo se permiten direcciones locales (127.0.0.1, ::1 o localhost): "
+                         "Martix nunca hace peticiones fuera de tu equipo",
+            }), 400
 
         try:
             import json as _json

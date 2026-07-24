@@ -32,7 +32,14 @@ def send_notification(title: str, message: str) -> None:
     def _notify():
         try:
             if sys.platform.startswith("linux"):
-                subprocess.Popen(["notify-send", title, message])
+                # El "--" es imprescindible: sin el, un archivo llamado
+                # "-e" o "--expire-time=0" se interpreta como OPCION de
+                # notify-send en vez de como texto. Ademas se desactiva el
+                # marcado del cuerpo, que notify-send interpreta como HTML.
+                subprocess.Popen([
+                    "notify-send", "--app-name=Martix", "--hint=string:x-canonical-private:1",
+                    "--", title, message,
+                ])
             elif sys.platform == "darwin":
                 script = (
                     "on run argv\n"

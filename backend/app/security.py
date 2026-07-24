@@ -306,6 +306,45 @@ def listening_beyond_localhost() -> bool:
     return HOST not in ("127.0.0.1", "localhost", "::1")
 
 
+# ---- destinos de salida permitidos (anti-SSRF) ------------------------------
+
+def is_loopback_url(url: str) -> bool:
+    """True solo si la URL apunta a este mismo equipo por http/https.
+
+    Martix hace exactamente UNA peticion saliente: al LLM local. Sin esta
+    comprobacion, el endpoint que "prueba la conexion con Ollama" acepta
+    cualquier URL y la solicita desde el servidor, convirtiendo a Martix en un
+    proxy para sondear la red interna del usuario o servicios que solo escuchan
+    en localhost (SSRF). Ademas es lo que respalda la promesa de privacidad:
+    el contenido de los documentos no puede salir del equipo.
+    """
+    import ipaddress
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse((url or "").strip())
+    except ValueError:
+        return False
+
+    if parsed.scheme not in ("http", "https"):
+        return False
+
+    hostname = (parsed.hostname or "").strip().lower()
+    if not hostname:
+        return False
+    if hostname == "localhost":
+        return True
+
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        # Un nombre de dominio podria resolver hoy a 127.0.0.1 y manana a otra
+        # cosa (DNS rebinding), asi que solo se admiten IPs literales.
+        return False
+
+    return address.is_loopback
+
+
 __all__ = [
     "API_TOKEN",
     "PORT",

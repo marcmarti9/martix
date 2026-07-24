@@ -5,6 +5,7 @@ archivo. Mira primero el nombre del archivo y, si hace falta, el contenido
 
 import re
 import unicodedata
+import warnings
 import xml.etree.ElementTree as ET
 import zipfile
 import shutil
@@ -21,10 +22,34 @@ try:
 except ImportError:
     _OCR_AVAILABLE = False
 
+# Bomba de descompresion de imagen: un PNG de pocos KB puede declarar
+# dimensiones enormes y hacer que PIL reserve gigabytes al decodificarlo.
+# Martix abre imagenes que vienen de descargas (OCR y EXIF), asi que se baja
+# el limite y se convierte el aviso de PIL en una excepcion de verdad.
+MAX_IMAGE_PIXELS = 64_000_000  # ~8000x8000, de sobra para cualquier foto real
+try:
+    from PIL import Image as _PILImage
+    _PILImage.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    warnings.simplefilter("error", _PILImage.DecompressionBombWarning)
+except Exception:  # pragma: no cover - Pillow no instalado
+    pass
+
 
 MAX_CONTENT_CHARS = 20_000  # suficiente para detectar el tema sin leer el pdf entero
 PDF_PAGES_TO_SCAN = 6
 MIN_KEYWORD_HITS = 1
+
+# Tope de tamano de los archivos que se abren para leer su contenido. PdfReader
+# analiza la estructura del PDF ENTERO antes de que el limite de paginas surta
+# efecto, asi que un PDF hostil de 2 GB podria colgar un worker del watcher.
+MAX_PARSEABLE_FILE_BYTES = 256 * 1024 * 1024
+
+
+def _within_size_limit(path: Path) -> bool:
+    try:
+        return path.stat().st_size <= MAX_PARSEABLE_FILE_BYTES
+    except OSError:
+        return False
 
 _categories = load_categories()
 
@@ -51,6 +76,8 @@ def normalize(text: str) -> str:
 
 
 def _extract_pdf_text(path: Path) -> str:
+    if not _within_size_limit(path):
+        return ""
     try:
         from pypdf import PdfReader
     except ImportError:
@@ -107,6 +134,8 @@ class _LimitedReader:
 
 def _extract_docx_text_defused(path: Path) -> str:
     """Variante con defusedxml: prohibe DTD y entidades a nivel de parser."""
+    if not _within_size_limit(path):
+        return ""
     texts: list[str] = []
     total = 0
     try:
@@ -144,6 +173,9 @@ def _extract_docx_text(path: Path) -> str:
     """
     if _DEFUSED_ITERPARSE is not None:
         return _extract_docx_text_defused(path)
+
+    if not _within_size_limit(path):
+        return ""
 
     texts: list[str] = []
     total_chars = 0
@@ -186,6 +218,8 @@ def _extract_docx_text(path: Path) -> str:
 
 
 def _extract_txt_text(path: Path) -> str:
+    if not _within_size_limit(path):
+        return ""
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
             return f.read(MAX_CONTENT_CHARS)
@@ -197,7 +231,7 @@ _OCR_EXTENSIONS = ("png", "jpg", "jpeg", "tiff", "bmp", "gif")
 
 
 def _extract_image_text(path: Path) -> str:
-    if not _OCR_AVAILABLE:
+    if not _OCR_AVAILABLE or not _within_size_limit(path):
         return ""
     try:
         # context manager: sin el, cada imagen analizada dejaba un descriptor
@@ -406,6 +440,8 @@ def extract_metadata(path: Path) -> dict[str, str | None]:
 
     # EXIF para .jpg, .jpeg, .png, .webp, .tiff
     if ext in ("jpg", "jpeg", "png", "webp", "tiff"):
+        if not _within_size_limit(path):
+            return res
         try:
             from PIL import Image, ExifTags
             with Image.open(path) as img:

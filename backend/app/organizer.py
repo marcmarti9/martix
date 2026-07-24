@@ -132,10 +132,20 @@ def invalidate_scan_dirs_cache() -> None:
         _scan_dirs_cache = None
 
 
-def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
+# La busqueda de duplicados corre dentro de la peticion HTTP y hashea con
+# SHA256. Sin topes, apuntarla a una carpeta enorme bloquea un worker de Flask
+# durante horas.
+MAX_DUPLICATE_FILES = 200_000
+DUPLICATE_TIME_BUDGET = 120.0
+
+
+def find_duplicates(directories: list[Path] | None = None,
+                    time_budget: float = DUPLICATE_TIME_BUDGET) -> list[dict]:
     """Busca archivos duplicados agrupando por tamaño, luego fast-hash, y finalmente hash completo."""
     if directories is None:
         directories = get_default_scan_dirs()
+
+    deadline = time.monotonic() + max(5.0, time_budget)
 
     files = []
     seen_paths = set()
@@ -143,13 +153,23 @@ def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
         if not root_dir.exists() or not root_dir.is_dir():
             continue
         for root, dirs, filenames in os.walk(root_dir):
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            if time.monotonic() > deadline or len(files) >= MAX_DUPLICATE_FILES:
+                logger.warning("busqueda de duplicados truncada por limite de tiempo o de archivos")
+                break
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".") and not (Path(root) / d).is_symlink()
+            ]
             for f in filenames:
                 if f.startswith('.'):
                     continue
                 if Path(f).suffix.lower() in IGNORED_SUFFIXES:
                     continue
                 file_path = Path(root) / f
+                if file_path.is_symlink():
+                    # Un enlace y su destino no son "duplicados": borrarlos
+                    # como tales romperia el original.
+                    continue
                 try:
                     resolved = file_path.resolve()
                     if resolved not in seen_paths and resolved.is_file():
@@ -183,6 +203,9 @@ def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
 
     duplicate_groups = {}
     for fh, paths in by_fast_hash.items():
+        if time.monotonic() > deadline:
+            logger.warning("fase de hash completo truncada por limite de tiempo")
+            break
         full_hash_groups = {}
         for path in paths:
             sha = calculate_sha256(path)
