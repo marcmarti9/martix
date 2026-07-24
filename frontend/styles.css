@@ -1554,3 +1554,25 @@ input:checked + .slider:before {
     color: #b45309;
     font-weight: 600;
 }
+
+.btn-update-badge {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 600 !important;
+    animation: pulseBadge 2.5s infinite ease-in-out;
+}
+
+.btn-update-badge:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+    transform: translateY(-1px);
+}
+
+@keyframes pulseBadge {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.88; transform: scale(1.03); }
+}
+
+.hidden {
+    display: none !important;
+}

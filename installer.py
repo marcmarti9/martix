@@ -122,7 +122,11 @@ WantedBy=default.target
         # 4c. Comando CLI 'martix' en ~/.local/bin/martix
         cli_wrapper = bin_dir / "martix"
         cli_script = f"""#!/usr/bin/env bash
-{python_bin} {BACKEND_DIR / 'desktop.py'} "$@"
+if [ "${{1:-}}" = "update" ] || [ "${{1:-}}" = "actualizar" ]; then
+    {sys.executable} "{PROJECT_ROOT / 'installer.py'}" update
+else
+    {python_bin} "{BACKEND_DIR / 'desktop.py'}" "$@"
+fi
 """
         cli_wrapper.write_text(cli_script, encoding="utf-8")
         cli_wrapper.chmod(0o755)
@@ -132,10 +136,67 @@ WantedBy=default.target
     print("🎉 ¡INSTALACIÓN DE MARTIX COMPLETADA CON ÉXITO!")
     print("=======================================================")
     print("• Puedes abrir Martix desde tu menú de aplicaciones o escribiendo 'martix' en la terminal.")
+    print("• Escribe 'martix update' en la terminal para buscar e instalar actualizaciones.")
     print("• Interfaz Web Dashboard: http://127.0.0.1:5000")
     print("• Martix se ejecutará automáticamente en segundo plano al iniciar tu sesión.")
     print("=======================================================\n")
 
 
+def update_martix():
+    print("\n=======================================================")
+    print("        🔄 ACTUALIZADOR DE MARTIX FILE EXPLORER")
+    print("=======================================================\n")
+
+    # 1. git fetch & pull
+    print("==> Buscando actualizaciones en el repositorio remoto...")
+    try:
+        subprocess.run(["git", "fetch", "origin", "main"], cwd=str(PROJECT_ROOT), check=False)
+        res_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False)
+        res_remote = subprocess.run(["git", "rev-parse", "origin/main"], cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False)
+        
+        head_commit = res_head.stdout.strip()
+        remote_commit = res_remote.stdout.strip()
+
+        if head_commit == remote_commit and head_commit != "":
+            print(f"✅ Martix ya está actualizado en la versión más reciente ({head_commit[:7]}).")
+        else:
+            print("==> Nueva versión detectada. Descargando cambios de git...")
+            pull_res = subprocess.run(["git", "pull", "origin", "main"], cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False)
+            if pull_res.returncode == 0:
+                print("✅ Código actualizado correctamente desde git origin/main.")
+            else:
+                print("⚠️ Aviso al hacer git pull:", pull_res.stderr or pull_res.stdout)
+    except Exception as exc:
+        print("⚠️ No se pudo comprobar git:", exc)
+
+    # 2. Re-instalar / verificar dependencias
+    python_bin = VENV_DIR / ("Scripts/python.exe" if os.name == "nt" else "bin/python3")
+    if VENV_DIR.exists():
+        print("==> Verificando dependencias en entorno virtual...")
+        req_file = BACKEND_DIR / "requirements.txt"
+        if req_file.exists():
+            subprocess.run([str(python_bin), "-m", "pip", "install", "--quiet", "-r", str(req_file)], check=False)
+        req_desktop = BACKEND_DIR / "requirements-desktop.txt"
+        if req_desktop.exists():
+            subprocess.run([str(python_bin), "-m", "pip", "install", "--quiet", "-r", str(req_desktop)], check=False)
+
+    # 3. Reiniciar servicio systemd en Linux si existe
+    if sys.platform.startswith("linux"):
+        try:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+            subprocess.run(["systemctl", "--user", "restart", "martix.service"], check=False)
+            print("✅ Servicio systemd 'martix.service' reiniciado con la versión nueva.")
+        except Exception as e:
+            print("⚠️ Nota sobre systemctl:", e)
+
+    print("\n=======================================================")
+    print("🎉 ¡MARTIX HA SIDO ACTUALIZADO CORRECTAMENTE!")
+    print("=======================================================\n")
+
+
 if __name__ == "__main__":
-    install_martix()
+    if len(sys.argv) > 1 and sys.argv[1].lower() in ("update", "actualizar", "--update", "-u"):
+        update_martix()
+    else:
+        install_martix()
+

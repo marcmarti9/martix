@@ -758,6 +758,56 @@ def create_app() -> Flask:
             "trash_id": outcome["entry_id"],
         })
 
+    @app.get("/api/version")
+    def get_version():
+        commit = ""
+        try:
+            res = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False)
+            commit = res.stdout.strip()
+        except Exception:
+            pass
+        return jsonify({"version": "2026.07.25", "commit": commit})
+
+    _update_check_cache = {"timestamp": 0, "result": None}
+
+    @app.get("/api/update/check")
+    def check_update():
+        now = time.time()
+        if _update_check_cache["result"] and (now - _update_check_cache["timestamp"] < 30):
+            return jsonify(_update_check_cache["result"])
+
+        head_commit, remote_commit = "", ""
+        update_available = False
+        try:
+            subprocess.run(["git", "fetch", "origin", "main"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False, timeout=5)
+            res_head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False)
+            res_remote = subprocess.run(["git", "rev-parse", "--short", "origin/main"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False)
+            head_commit = res_head.stdout.strip()
+            remote_commit = res_remote.stdout.strip()
+            if head_commit and remote_commit and head_commit != remote_commit:
+                update_available = True
+        except Exception:
+            pass
+
+        result = {
+            "update_available": update_available,
+            "current_commit": head_commit,
+            "latest_commit": remote_commit,
+            "message": "Actualización disponible" if update_available else "Martix está actualizado"
+        }
+        _update_check_cache["timestamp"] = now
+        _update_check_cache["result"] = result
+        return jsonify(result)
+
+    @app.post("/api/update/apply")
+    def apply_update():
+        def _run():
+            installer_script = PROJECT_DIR / "installer.py"
+            subprocess.run([sys.executable, str(installer_script), "update"], check=False)
+
+        threading.Thread(target=_run, daemon=True).start()
+        return jsonify({"success": True, "message": "Iniciando actualización en segundo plano..."})
+
     return app
 
 

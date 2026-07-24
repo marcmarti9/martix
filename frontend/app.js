@@ -270,7 +270,13 @@ const TRANSLATIONS = {
         disk_analyzer_selected: "Seleccionado",
         disk_analyzer_delete_btn: "Eliminar Elemento",
         disk_analyzer_confirm_delete: "¿Estás seguro de que deseas eliminar permanentemente:\n\n{path}?",
-        disk_analyzer_close_btn: "Cerrar"
+        disk_analyzer_close_btn: "Cerrar",
+
+        // Updates
+        update_available_btn: "🚀 Actualización disponible",
+        update_available_title: "Existe una nueva versión de Martix en el repositorio. Haz clic para actualizar.",
+        update_confirm_dialog: "¿Deseas actualizar Martix a la última versión disponible desde GitHub?",
+        status_updating: "Actualizando Martix en segundo plano..."
     },
     en: {
         patrol_label: "Active Patrol",
@@ -354,6 +360,12 @@ const TRANSLATIONS = {
         disk_analyzer_delete_btn: "Delete Item",
         disk_analyzer_confirm_delete: "Are you sure you want to permanently delete:\n\n{path}?",
         disk_analyzer_close_btn: "Close",
+
+        // Updates
+        update_available_btn: "🚀 Update available",
+        update_available_title: "A new version of Martix is available. Click to update.",
+        update_confirm_dialog: "Do you want to update Martix to the latest version from GitHub?",
+        status_updating: "Updating Martix in the background...",
 
         topics_hint: "A Topic is anything you want to group: your bank, the gym, a specific app, invoices from a supplier... Martix looks at the filename and, if needed, its content, searching for these keywords.",
         topic_name_label: "Topic name",
@@ -2418,7 +2430,14 @@ function renderDiskAnalyzerTreemap() {
     function getTileColor(item, index) {
         if (item.color && item.color !== "#94a3b8") return item.color;
         if (item.is_dir) return categoryColors[index % categoryColors.length];
-        return "#3b82f6";
+        
+        const ext = (item.extension || item.name.split(".").pop() || "").toLowerCase().replace(/^\./, "");
+        if (ext) {
+            let hash = 0;
+            for (let i = 0; i < ext.length; i++) hash = (hash * 47 + ext.charCodeAt(i)) % 360;
+            return `hsl(${hash}, 65%, 55%)`;
+        }
+        return categoryColors[index % categoryColors.length];
     }
 
     function squarify(rects, x, y, w, h) {
@@ -2595,6 +2614,55 @@ if (btnCloseDiskAnalyzerFooter) btnCloseDiskAnalyzerFooter.addEventListener("cli
 if (btnDiskAnalyzerScan) btnDiskAnalyzerScan.addEventListener("click", runDiskAnalyzerScan);
 if (diskAnalyzerTreeFilter) diskAnalyzerTreeFilter.addEventListener("input", renderDiskAnalyzerTree);
 
+if (diskAnalyzerModal) {
+    diskAnalyzerModal.addEventListener("cancel", (e) => {
+        e.preventDefault();
+        closeDiskAnalyzerModal();
+    });
+    diskAnalyzerModal.addEventListener("click", (e) => {
+        if (e.target === diskAnalyzerModal) {
+            closeDiskAnalyzerModal();
+        }
+    });
+}
+
+async function checkAppUpdates() {
+    try {
+        const res = await fetch("/api/update/check", withToken());
+        if (res.ok) {
+            const data = await res.json();
+            const btnUpdate = document.getElementById("btn-update-check");
+            if (btnUpdate) {
+                if (data.update_available) {
+                    btnUpdate.classList.remove("hidden");
+                } else {
+                    btnUpdate.classList.add("hidden");
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Error comprobando actualizaciones:", e);
+    }
+}
+
+const btnUpdateCheck = document.getElementById("btn-update-check");
+if (btnUpdateCheck) {
+    btnUpdateCheck.addEventListener("click", async () => {
+        if (confirm(t("update_confirm_dialog"))) {
+            try {
+                showStatusMessage(t("status_updating"));
+                const res = await fetch("/api/update/apply", { method: "POST", headers: { "Content-Type": "application/json" } });
+                if (res.ok) {
+                    showStatusMessage(t("status_updating"));
+                    setTimeout(() => { location.reload(); }, 4000);
+                }
+            } catch (e) {
+                alert("Error al iniciar actualización: " + e);
+            }
+        }
+    });
+}
+
 async function init() {
     applyLanguage();
     updateThemeButton();
@@ -2616,7 +2684,9 @@ async function init() {
     await Promise.all([refreshStatus(), loadTree(), refreshTopics(), refreshRules(), refreshGeneralSettings(), refreshMaintenance(), refreshWatchedFolders()]);
     renderBreadcrumbs();
     await renderContent();
+    checkAppUpdates();
     setInterval(refreshStatus, 5000);
+    setInterval(checkAppUpdates, 60000);
 
     if (!isAlreadyOnboarded) {
         openWelcomeModal();

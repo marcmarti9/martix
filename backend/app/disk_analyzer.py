@@ -15,17 +15,20 @@ from config.settings import DOWNLOADS_DIR, HOME_DIR, load_categories
 
 
 EXTENSION_CATEGORIES = {
-    # Imagenes
-    "png": ("Imagen PNG", "#3b82f6"),
-    "jpg": ("Imagen JPEG", "#3b82f6"),
-    "jpeg": ("Imagen JPEG", "#3b82f6"),
-    "gif": ("GIF Animado", "#3b82f6"),
-    "webp": ("Imagen WebP", "#3b82f6"),
-    "svg": ("Vectorial SVG", "#3b82f6"),
-    "bmp": ("Imagen BMP", "#3b82f6"),
-    "ico": ("Icono ICO", "#3b82f6"),
-    "tiff": ("Imagen TIFF", "#3b82f6"),
-    # Video
+    # Imagenes - Purpura / Indigo
+    "png": ("Imagen PNG", "#8b5cf6"),
+    "jpg": ("Imagen JPEG", "#8b5cf6"),
+    "jpeg": ("Imagen JPEG", "#8b5cf6"),
+    "gif": ("GIF Animado", "#8b5cf6"),
+    "webp": ("Imagen WebP", "#8b5cf6"),
+    "svg": ("Vectorial SVG", "#8b5cf6"),
+    "bmp": ("Imagen BMP", "#8b5cf6"),
+    "ico": ("Icono ICO", "#8b5cf6"),
+    "tiff": ("Imagen TIFF", "#8b5cf6"),
+    "heic": ("Imagen HEIC", "#8b5cf6"),
+    "raw": ("Imagen RAW", "#8b5cf6"),
+    "psd": ("Proyecto Photoshop", "#8b5cf6"),
+    # Video - Verde Esmeralda
     "mp4": ("Vídeo MP4", "#10b981"),
     "mkv": ("Vídeo MKV", "#10b981"),
     "avi": ("Vídeo AVI", "#10b981"),
@@ -33,26 +36,30 @@ EXTENSION_CATEGORIES = {
     "wmv": ("Vídeo WMV", "#10b981"),
     "webm": ("Vídeo WebM", "#10b981"),
     "flv": ("Vídeo FLV", "#10b981"),
-    # Audio
-    "mp3": ("Audio MP3", "#8b5cf6"),
-    "wav": ("Audio WAV", "#8b5cf6"),
-    "flac": ("Audio FLAC", "#8b5cf6"),
-    "aac": ("Audio AAC", "#8b5cf6"),
-    "ogg": ("Audio OGG", "#8b5cf6"),
-    "m4a": ("Audio M4A", "#8b5cf6"),
-    # Documentos
-    "pdf": ("Documento PDF", "#ec4899"),
-    "docx": ("Documento Word", "#ec4899"),
-    "doc": ("Documento Word", "#ec4899"),
-    "xlsx": ("Hoja de Cálculo Excel", "#ec4899"),
-    "xls": ("Hoja de Cálculo Excel", "#ec4899"),
-    "pptx": ("Presentación PowerPoint", "#ec4899"),
-    "ppt": ("Presentación PowerPoint", "#ec4899"),
-    "txt": ("Texto Plano", "#ec4899"),
-    "csv": ("Archivo CSV", "#ec4899"),
-    "odt": ("Documento ODT", "#ec4899"),
-    "md": ("Markdown", "#ec4899"),
-    # Archivos comprimidos
+    "m4v": ("Vídeo M4V", "#10b981"),
+    # Audio - Rosa / Magenta
+    "mp3": ("Audio MP3", "#ec4899"),
+    "wav": ("Audio WAV", "#ec4899"),
+    "flac": ("Audio FLAC", "#ec4899"),
+    "aac": ("Audio AAC", "#ec4899"),
+    "ogg": ("Audio OGG", "#ec4899"),
+    "m4a": ("Audio M4A", "#ec4899"),
+    "wma": ("Audio WMA", "#ec4899"),
+    "opus": ("Audio OPUS", "#ec4899"),
+    # Documentos - Naranja / Carmín
+    "pdf": ("Documento PDF", "#f97316"),
+    "docx": ("Documento Word", "#f97316"),
+    "doc": ("Documento Word", "#f97316"),
+    "xlsx": ("Hoja de Cálculo Excel", "#f97316"),
+    "xls": ("Hoja de Cálculo Excel", "#f97316"),
+    "pptx": ("Presentación PowerPoint", "#f97316"),
+    "ppt": ("Presentación PowerPoint", "#f97316"),
+    "txt": ("Texto Plano", "#f97316"),
+    "csv": ("Archivo CSV", "#f97316"),
+    "odt": ("Documento ODT", "#f97316"),
+    "md": ("Markdown", "#f97316"),
+    "epub": ("Libro EPUB", "#f97316"),
+    # Archivos comprimidos - Ámbar / Dorado
     "zip": ("Archivo ZIP", "#f59e0b"),
     "tar": ("Archivo TAR", "#f59e0b"),
     "gz": ("Comprimido GZ", "#f59e0b"),
@@ -60,21 +67,42 @@ EXTENSION_CATEGORIES = {
     "rar": ("Archivo RAR", "#f59e0b"),
     "iso": ("Imagen ISO", "#f59e0b"),
     "bz2": ("Comprimido BZ2", "#f59e0b"),
-    # Ejecutables y codigo
-    "exe": ("Ejecutable Windows", "#06b6d4"),
-    "app": ("Aplicación macOS", "#06b6d4"),
+    "xz": ("Comprimido XZ", "#f59e0b"),
+    "tgz": ("Comprimido TGZ", "#f59e0b"),
+    "deb": ("Paquete DEB", "#f59e0b"),
+    "rpm": ("Paquete RPM", "#f59e0b"),
+    # Ejecutables, modelos IA y binarios - Violeta / Azul Eléctrico / Cian
+    "exe": ("Ejecutable Windows", "#a855f7"),
+    "app": ("Aplicación macOS", "#a855f7"),
+    "appimage": ("Aplicación AppImage", "#a855f7"),
+    "dll": ("Librería DLL", "#a855f7"),
+    "so": ("Librería Compartida SO", "#a855f7"),
+    "dylib": ("Librería dylib macOS", "#a855f7"),
+    "gguf": ("Modelo IA GGUF", "#d946ef"),
+    "safetensors": ("Modelo IA SafeTensors", "#d946ef"),
+    "bin": ("Binario / Datos", "#a855f7"),
+    "jar": ("Archivo Java JAR", "#a855f7"),
+    "rlib": ("Librería Rust RLIB", "#a855f7"),
+    "a": ("Librería Estática", "#a855f7"),
+    "o": ("Objeto Compilado", "#a855f7"),
+    "node": ("Módulo Node.js Native", "#a855f7"),
+    "part": ("Descarga Parcial", "#e11d48"),
+    "dill": ("Objeto Serializado Python", "#06b6d4"),
+    # Código y scripts - Cian / Celeste
     "sh": ("Script Bash", "#06b6d4"),
     "py": ("Código Python", "#06b6d4"),
     "js": ("Código JavaScript", "#06b6d4"),
     "ts": ("Código TypeScript", "#06b6d4"),
+    "jsx": ("Componente React", "#06b6d4"),
+    "tsx": ("Componente React TS", "#06b6d4"),
     "html": ("Página HTML", "#06b6d4"),
     "css": ("Estilo CSS", "#06b6d4"),
     "json": ("Datos JSON", "#06b6d4"),
     "cpp": ("Código C++", "#06b6d4"),
     "c": ("Código C", "#06b6d4"),
+    "rs": ("Código Rust", "#06b6d4"),
+    "go": ("Código Go", "#06b6d4"),
     "java": ("Código Java", "#06b6d4"),
-    "dll": ("Librería DLL", "#06b6d4"),
-    "so": ("Librería Compartida SO", "#06b6d4"),
     # Datos y sistema
     "db": ("Base de Datos SQLite/DB", "#64748b"),
     "sqlite": ("Base de Datos SQLite", "#64748b"),
@@ -83,13 +111,37 @@ EXTENSION_CATEGORIES = {
 }
 
 
+def _hsl_to_hex(h: float, s: float, l: float) -> str:
+    """Convierte valores HSL (0-360, 0-1, 0-1) a formato Hex (#rrggbb)."""
+    c = (1 - abs(2 * l - 1)) * s
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = l - c / 2
+    if 0 <= h < 60:
+        r, g, b = c, x, 0
+    elif 60 <= h < 120:
+        r, g, b = x, c, 0
+    elif 120 <= h < 180:
+        r, g, b = 0, c, x
+    elif 180 <= h < 240:
+        r, g, b = 0, x, c
+    elif 240 <= h < 300:
+        r, g, b = x, 0, c
+    else:
+        r, g, b = c, 0, x
+    ri, gi, bi = int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)
+    return f"#{ri:02x}{gi:02x}{bi:02x}"
+
+
 def get_extension_info(ext: str) -> Tuple[str, str]:
-    ext_clean = ext.lower().lstrip(".")
+    ext_clean = ext.lower().strip().lstrip(".")
     if not ext_clean:
-        return "(Sin extensión)", "#94a3b8"
+        return "(Sin extensión)", "#64748b"
     if ext_clean in EXTENSION_CATEGORIES:
         return EXTENSION_CATEGORIES[ext_clean]
-    return f"Archivo .{ext_clean.upper()}", "#94a3b8"
+    # Generar color HSL determinista para cualquier extensión no listada
+    h = sum(ord(ch) for ch in ext_clean) * 47 % 360
+    color_hex = _hsl_to_hex(h, 0.65, 0.55)
+    return f"Archivo .{ext_clean.upper()}", color_hex
 
 
 def format_bytes(bytes_num: int) -> str:
