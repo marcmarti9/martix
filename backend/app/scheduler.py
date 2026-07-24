@@ -127,16 +127,30 @@ class TaskScheduler:
         }
 
     def _run_loop(self) -> None:
-        last_run = 0.0
+        # La primera ejecucion espera un intervalo completo: arrancar Martix no
+        # debe disparar de inmediato un barrido y un borrado por mantenimiento
+        # (el usuario tiene "Ejecutar ahora" para eso).
+        last_run = time.monotonic()
         while not self._stop_event.is_set():
-            now = time.time()
-            interval_seconds = self._interval_minutes * 60
-            if (now - last_run) >= interval_seconds:
-                if self._enabled:
-                    self.run_now()
-                last_run = time.time()
+            interval_seconds = max(60, self._interval_minutes * 60)
+            elapsed = time.monotonic() - last_run
+            remaining = interval_seconds - elapsed
 
-            self._stop_event.wait(0.5)
+            if remaining > 0:
+                # Se espera lo que de verdad queda, no se hace busy-wait cada
+                # 0,5 s: eso eran 172.800 despertares al dia que impedian a la
+                # CPU entrar en estados de bajo consumo.
+                # El tope de 60 s permite que un cambio de intervalo desde la
+                # interfaz se note sin tener que reiniciar el hilo.
+                self._stop_event.wait(min(remaining, 60.0))
+                continue
+
+            if self._enabled:
+                try:
+                    self.run_now()
+                except Exception:
+                    logger.exception("fallo en la ejecucion programada")
+            last_run = time.monotonic()
 
 
 scheduler = TaskScheduler()

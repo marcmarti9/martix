@@ -6,6 +6,7 @@ import datetime
 import hashlib
 import json
 import logging
+import ntpath
 import os
 import re
 import shutil
@@ -15,10 +16,21 @@ import time
 import zipfile
 from pathlib import Path
 
-from app import db
+from app import db, trash
 from app.browser import resolve_safe_path
-from app.classifier import classify, normalize, _extract_content, extract_metadata
-from app.security import safe_destination_dir
+from app.classifier import (
+    classify,
+    content_is_extractable,
+    extract_metadata,
+    normalize,
+    _extract_content,
+)
+from app.security import (
+    PROTECTED_PATHS,
+    RESERVED_DIR_NAMES,
+    is_protected_path,
+    safe_destination_dir,
+)
 from config.settings import DOWNLOADS_DIR, HOME_DIR, IGNORED_SUFFIXES, is_temporary_download_file, is_file_in_use
 
 logger = logging.getLogger("martix.organizer")
@@ -53,37 +65,87 @@ def calculate_fast_hash(path: Path) -> str:
 
 
 def get_default_scan_dirs() -> list[Path]:
+    """Carpetas que Martix considera 'suyas': Descargas, las carpetas de las
+    categorias, los destinos de los Temas y las carpetas vigiladas."""
     dirs = set()
     dirs.add(DOWNLOADS_DIR.resolve())
+
+    def _add(folder_str: str | None) -> None:
+        if not folder_str:
+            return
+        resolved = safe_destination_dir(folder_str)
+        if resolved and resolved.exists():
+            dirs.add(resolved.resolve())
+
     try:
         from config.settings import load_categories
-        categories = load_categories()["categories"]
-        for cat in categories.values():
-            folder_str = cat.get("folder")
-            if folder_str:
-                from app.security import safe_destination_dir
-                resolved = safe_destination_dir(folder_str)
-                if resolved and resolved.exists():
-                    dirs.add(resolved.resolve())
+        for cat in load_categories()["categories"].values():
+            _add(cat.get("folder"))
     except Exception:
-        pass
+        logger.debug("no se pudieron leer las categorias para el listado de carpetas", exc_info=True)
     try:
         for topic in db.list_topics():
-            folder_str = topic.get("destination")
-            if folder_str:
-                from app.security import safe_destination_dir
-                resolved = safe_destination_dir(folder_str)
-                if resolved and resolved.exists():
-                    dirs.add(resolved.resolve())
+            _add(topic.get("destination"))
     except Exception:
-        pass
+        logger.debug("no se pudieron leer los Temas para el listado de carpetas", exc_info=True)
+    try:
+        # Las carpetas VIGILADAS por el usuario tambien son intocables: sin
+        # esto, Martix podia clasificar y mover la propia carpeta que estaba
+        # vigilando, dejando la vigilancia apuntando a una ruta inexistente.
+        for watched in db.list_watched_folders():
+            if not watched.get("active", 1):
+                continue
+            raw = watched.get("folder_path")
+            if raw:
+                candidate = Path(raw)
+                if candidate.exists():
+                    dirs.add(candidate.resolve())
+    except Exception:
+        logger.debug("no se pudieron leer las carpetas vigiladas", exc_info=True)
+
     return list(dirs)
 
 
-def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
+# get_default_scan_dirs() consulta la base de datos y el disco; durante un
+# barrido se llama una vez por entrada. Se cachea unos segundos: cambia solo
+# cuando el usuario toca sus Temas o carpetas vigiladas.
+_SCAN_DIRS_TTL_SECONDS = 5.0
+_scan_dirs_cache: tuple[float, list[Path]] | None = None
+_scan_dirs_lock = threading.Lock()
+
+
+def get_cached_scan_dirs() -> list[Path]:
+    global _scan_dirs_cache
+    with _scan_dirs_lock:
+        now = time.monotonic()
+        if _scan_dirs_cache is not None and now - _scan_dirs_cache[0] < _SCAN_DIRS_TTL_SECONDS:
+            return _scan_dirs_cache[1]
+        dirs = get_default_scan_dirs()
+        _scan_dirs_cache = (now, dirs)
+        return dirs
+
+
+def invalidate_scan_dirs_cache() -> None:
+    """Llamar tras anadir/quitar Temas o carpetas vigiladas."""
+    global _scan_dirs_cache
+    with _scan_dirs_lock:
+        _scan_dirs_cache = None
+
+
+# La busqueda de duplicados corre dentro de la peticion HTTP y hashea con
+# SHA256. Sin topes, apuntarla a una carpeta enorme bloquea un worker de Flask
+# durante horas.
+MAX_DUPLICATE_FILES = 200_000
+DUPLICATE_TIME_BUDGET = 120.0
+
+
+def find_duplicates(directories: list[Path] | None = None,
+                    time_budget: float = DUPLICATE_TIME_BUDGET) -> list[dict]:
     """Busca archivos duplicados agrupando por tamaño, luego fast-hash, y finalmente hash completo."""
     if directories is None:
         directories = get_default_scan_dirs()
+
+    deadline = time.monotonic() + max(5.0, time_budget)
 
     files = []
     seen_paths = set()
@@ -91,13 +153,23 @@ def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
         if not root_dir.exists() or not root_dir.is_dir():
             continue
         for root, dirs, filenames in os.walk(root_dir):
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            if time.monotonic() > deadline or len(files) >= MAX_DUPLICATE_FILES:
+                logger.warning("busqueda de duplicados truncada por limite de tiempo o de archivos")
+                break
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".") and not (Path(root) / d).is_symlink()
+            ]
             for f in filenames:
                 if f.startswith('.'):
                     continue
                 if Path(f).suffix.lower() in IGNORED_SUFFIXES:
                     continue
                 file_path = Path(root) / f
+                if file_path.is_symlink():
+                    # Un enlace y su destino no son "duplicados": borrarlos
+                    # como tales romperia el original.
+                    continue
                 try:
                     resolved = file_path.resolve()
                     if resolved not in seen_paths and resolved.is_file():
@@ -131,6 +203,9 @@ def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
 
     duplicate_groups = {}
     for fh, paths in by_fast_hash.items():
+        if time.monotonic() > deadline:
+            logger.warning("fase de hash completo truncada por limite de tiempo")
+            break
         full_hash_groups = {}
         for path in paths:
             sha = calculate_sha256(path)
@@ -167,25 +242,79 @@ def find_duplicates(directories: list[Path] | None = None) -> list[dict]:
 
 
 
+# Limites de descompresion. Sin ellos, un .zip de pocos KB descargado
+# automaticamente puede expandirse a cientos de GB y llenar el disco
+# (zip bomb), o crear millones de entradas hasta agotar los inodos.
+MAX_UNPACKED_BYTES = 4 * 1024 * 1024 * 1024   # 4 GB de contenido total
+MAX_UNPACKED_ENTRIES = 20_000                  # numero de archivos dentro
+MAX_COMPRESSION_RATIO = 200                    # x veces el tamano del comprimido
+UNPACK_FREE_SPACE_MARGIN = 512 * 1024 * 1024   # dejar siempre 512 MB libres
+
+
+def _check_unpack_budget(archive_path: Path, extract_dir_abs: str,
+                         total_uncompressed: int, entries: int) -> None:
+    """Rechaza archivos comprimidos cuyo contenido no cabe o es desproporcionado."""
+    if entries > MAX_UNPACKED_ENTRIES:
+        raise ValueError(
+            f"el comprimido contiene {entries} entradas (maximo {MAX_UNPACKED_ENTRIES})"
+        )
+    if total_uncompressed > MAX_UNPACKED_BYTES:
+        raise ValueError(
+            f"el contenido descomprimido ocuparia {total_uncompressed} bytes "
+            f"(maximo {MAX_UNPACKED_BYTES})"
+        )
+    try:
+        compressed = archive_path.stat().st_size
+    except OSError:
+        compressed = 0
+    if compressed > 0 and total_uncompressed / compressed > MAX_COMPRESSION_RATIO:
+        raise ValueError(
+            f"ratio de compresion sospechoso (x{total_uncompressed / compressed:.0f}); "
+            "posible zip bomb"
+        )
+    try:
+        free = shutil.disk_usage(extract_dir_abs).free
+        if total_uncompressed + UNPACK_FREE_SPACE_MARGIN > free:
+            raise ValueError("no hay espacio libre suficiente para descomprimir")
+    except OSError:
+        pass
+
+
+def _validate_member_name(name: str, extract_dir_abs: str, kind: str) -> str:
+    """Valida el nombre de una entrada y devuelve su ruta absoluta de destino."""
+    if not name or name.startswith("/") or name.startswith("\\") or ntpath.isabs(name):
+        raise ValueError(f"Ruta absoluta detectada en archivo {kind}: {name}")
+    if "\x00" in name:
+        raise ValueError(f"Nombre invalido en archivo {kind}: {name!r}")
+    member_path = os.path.abspath(os.path.join(extract_dir_abs, name))
+    if not (member_path == extract_dir_abs or member_path.startswith(extract_dir_abs + os.sep)):
+        raise ValueError(f"Zip-Slip detectado en archivo {kind}: {name}")
+    return member_path
+
+
 def unpack_archive(archive_path: Path, extract_dir: Path) -> None:
-    """Desempaqueta un archivo comprimido de forma segura validando contra Zip-Slip / Path Traversal."""
+    """Desempaqueta un archivo comprimido de forma segura, validando Zip-Slip /
+    Path Traversal, enlaces que escapan del directorio y bombas de compresion."""
     extract_dir_abs = os.path.abspath(extract_dir)
     extract_dir.mkdir(parents=True, exist_ok=True)
     name_lower = archive_path.name.lower()
 
     if zipfile.is_zipfile(archive_path) or name_lower.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zf:
-            for member in zf.infolist():
-                member_path = os.path.abspath(os.path.join(extract_dir_abs, member.filename))
-                if not (member_path == extract_dir_abs or member_path.startswith(extract_dir_abs + os.sep)):
-                    raise ValueError(f"Zip-Slip detectado en archivo zip: {member.filename}")
+            members = zf.infolist()
+            total = 0
+            for member in members:
+                _validate_member_name(member.filename, extract_dir_abs, "zip")
+                total += member.file_size
+            _check_unpack_budget(archive_path, extract_dir_abs, total, len(members))
             zf.extractall(extract_dir_abs)
     elif tarfile.is_tarfile(archive_path) or name_lower.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".gz")):
         with tarfile.open(archive_path, "r:*") as tf:
-            for member in tf.getmembers():
-                member_path = os.path.abspath(os.path.join(extract_dir_abs, member.name))
-                if not (member_path == extract_dir_abs or member_path.startswith(extract_dir_abs + os.sep)):
-                    raise ValueError(f"Zip-Slip detectado en archivo tar: {member.name}")
+            members = tf.getmembers()
+            total = 0
+            for member in members:
+                member_path = _validate_member_name(member.name, extract_dir_abs, "tar")
+                total += max(member.size, 0)
                 # Los symlinks/hardlinks pueden apuntar fuera del directorio de
                 # extraccion aunque su propio nombre sea seguro; se valida el
                 # destino del enlace por separado (CVE-2007-4559 style).
@@ -199,14 +328,103 @@ def unpack_archive(archive_path: Path, extract_dir: Path) -> None:
                     link_target == extract_dir_abs or link_target.startswith(extract_dir_abs + os.sep)
                 ):
                     raise ValueError(f"Enlace inseguro detectado en archivo tar: {member.name} -> {member.linkname}")
-            tf.extractall(extract_dir_abs)
+                # Dispositivos y FIFOs no tienen sentido en una descarga y son
+                # una via clasica de abuso.
+                if member.isdev():
+                    raise ValueError(f"Entrada de dispositivo no permitida en tar: {member.name}")
+            _check_unpack_budget(archive_path, extract_dir_abs, total, len(members))
+            # filter="data" (Python 3.12+) descarta permisos peligrosos, setuid
+            # y rutas absolutas tambien dentro de extractall.
+            try:
+                tf.extractall(extract_dir_abs, filter="data")
+            except TypeError:  # Python < 3.12
+                tf.extractall(extract_dir_abs)
     else:
         raise ValueError(f"Formato de archivo comprimido no soportado: {archive_path}")
 
 
-def check_conditions(path: Path, ext: str, conditions_str: str | None) -> bool:
+# Marcador para "este dato no se ha podido obtener". Distinto de None y de "":
+# si no se puede evaluar un campo, la condicion NO casa.
+_UNAVAILABLE = object()
+
+_METADATA_FIELDS = ("artist", "album", "title", "year", "camera", "exif_date")
+
+
+class FileFacts:
+    """Datos de un archivo calculados como mucho una vez.
+
+    Evaluar varias condiciones sobre el mismo archivo repetia el trabajo caro:
+    una regla con tres condiciones de contenido volvia a abrir y parsear el PDF
+    tres veces.
+    """
+
+    __slots__ = ("path", "ext", "_cache")
+
+    def __init__(self, path: Path, ext: str):
+        self.path = path
+        self.ext = ext
+        self._cache: dict[str, object] = {}
+
+    def _stat(self):
+        if "stat" not in self._cache:
+            try:
+                self._cache["stat"] = self.path.stat()
+            except OSError:
+                self._cache["stat"] = _UNAVAILABLE
+        return self._cache["stat"]
+
+    def value_for(self, field: str):
+        if field == "name":
+            return self.path.name
+        if field == "stem":
+            return self.path.stem
+        if field == "extension":
+            return self.ext
+        if field == "size_kb":
+            st = self._stat()
+            return _UNAVAILABLE if st is _UNAVAILABLE else st.st_size / 1024
+        if field == "age_days":
+            st = self._stat()
+            return _UNAVAILABLE if st is _UNAVAILABLE else (time.time() - st.st_mtime) / 86400
+        if field == "content":
+            if "content" not in self._cache:
+                # Si Martix no sabe leer esta extension el contenido es
+                # DESCONOCIDO, no vacio: devolver "" hacia que
+                # `content not_contains X` casase con todos los binarios.
+                self._cache["content"] = (
+                    _extract_content(self.path, self.ext)
+                    if content_is_extractable(self.ext) else _UNAVAILABLE
+                )
+            return self._cache["content"]
+        if field in _METADATA_FIELDS:
+            if "meta" not in self._cache:
+                self._cache["meta"] = extract_metadata(self.path)
+            value = self._cache["meta"].get(field)
+            return _UNAVAILABLE if value is None else value
+        return _UNAVAILABLE
+
+
+def _compare_numeric(actual, expected, op: str) -> bool | None:
+    """Compara numericamente. None si alguno de los dos no es un numero."""
+    try:
+        a, b = float(actual), float(expected)
+    except (ValueError, TypeError):
+        return None
+    return {
+        "gt": a > b, ">": a > b,
+        "lt": a < b, "<": a < b,
+        "gte": a >= b, ">=": a >= b,
+        "lte": a <= b, "<=": a <= b,
+        "equals": a == b, "==": a == b,
+    }.get(op)
+
+
+def check_conditions(path: Path, ext: str, conditions_str: str | None,
+                     facts: FileFacts | None = None) -> bool:
+    """Evalua las condiciones de una regla en AND. Si un campo no se puede
+    obtener, la regla no casa."""
     if not conditions_str:
-        return True # Si no hay condiciones adicionales, es un match directo
+        return True  # Si no hay condiciones adicionales, es un match directo
     try:
         conditions = json.loads(conditions_str)
     except Exception:
@@ -214,82 +432,47 @@ def check_conditions(path: Path, ext: str, conditions_str: str | None) -> bool:
     if not isinstance(conditions, list):
         return False
 
+    if facts is None:
+        facts = FileFacts(path, ext)
+
     for cond in conditions:
+        if not isinstance(cond, dict):
+            return False
         field = cond.get("field")
         op = cond.get("operator")
         val = cond.get("value")
         if not field or not op:
             continue
 
-        actual = None
-        if field == "name":
-            actual = path.name
-        elif field == "stem":
-            actual = path.stem
-        elif field == "extension":
-            actual = ext
-        elif field == "size_kb":
-            try:
-                actual = path.stat().st_size / 1024
-            except OSError:
-                return False
-        elif field == "age_days":
-            try:
-                actual = (time.time() - path.stat().st_mtime) / 86400
-            except OSError:
-                return False
-        elif field == "content":
-            actual = _extract_content(path, ext)
-        elif field in ("artist", "album", "title", "year", "camera", "exif_date"):
-            meta = extract_metadata(path)
-            actual = meta.get(field)
-
-        if actual is None:
+        actual = facts.value_for(field)
+        if actual is _UNAVAILABLE or actual is None:
             return False
 
-        if op == "contains":
+        if op in ("gt", ">", "lt", "<", "gte", ">=", "lte", "<="):
+            if _compare_numeric(actual, val, op) is not True:
+                return False
+        elif op in ("equals", "=="):
+            numeric = _compare_numeric(actual, val, op)
+            if numeric is None:
+                if normalize(str(actual)) != normalize(str(val)):
+                    return False
+            elif not numeric:
+                return False
+        elif op == "contains":
             if not isinstance(actual, str) or normalize(val) not in normalize(actual):
                 return False
         elif op == "not_contains":
             if not isinstance(actual, str) or normalize(val) in normalize(actual):
                 return False
-        elif op in ("equals", "=="):
-            try:
-                if float(actual) != float(val):
-                    return False
-            except (ValueError, TypeError):
-                if normalize(str(actual)) != normalize(str(val)):
-                    return False
         elif op == "starts_with":
             if not isinstance(actual, str) or not normalize(actual).startswith(normalize(val)):
                 return False
         elif op == "ends_with":
             if not isinstance(actual, str) or not normalize(actual).endswith(normalize(val)):
                 return False
-        elif op in ("gt", ">"):
-            try:
-                if float(actual) <= float(val):
-                    return False
-            except (ValueError, TypeError):
-                return False
-        elif op in ("lt", "<"):
-            try:
-                if float(actual) >= float(val):
-                    return False
-            except (ValueError, TypeError):
-                return False
-        elif op in ("gte", ">="):
-            try:
-                if float(actual) < float(val):
-                    return False
-            except (ValueError, TypeError):
-                return False
-        elif op in ("lte", "<="):
-            try:
-                if float(actual) > float(val):
-                    return False
-            except (ValueError, TypeError):
-                return False
+        else:
+            # operador desconocido: no se puede afirmar que la regla case
+            return False
     return True
 
 
@@ -326,28 +509,60 @@ def format_rename_pattern(pattern: str, path: Path, category: str, topic_name: s
     for placeholder, val in placeholders.items():
         new_name = new_name.replace(placeholder, val)
 
+    # Sanitizar el nombre del archivo final. Se hace ANTES de comprobar si ha
+    # quedado vacio, para que un patron como "{ARTIST}/{TITLE}" no se cuele.
+    new_name = re.sub(r'[\x00/\\:*?"<>|]', "_", new_name)
+
+    # Los placeholders sin valor (un archivo sin tema, un mp3 sin etiquetas)
+    # dejaban nombres invalidos: "{Topic}" -> "" -> `dest_dir / ""` es el
+    # PROPIO directorio destino, y con extension quedaba ".pdf", un archivo
+    # oculto y sin nombre. Si no queda nada util, se conserva el original.
+    stem_candidate = Path(new_name).stem.strip(" .-_")
+    if not stem_candidate:
+        logger.info(
+            "el patron de renombrado %r no produjo un nombre util para %s; se conserva el original",
+            pattern, path.name,
+        )
+        return path.name
+
+    new_name = new_name.strip(" .")
+
     # Si el patron no especifica la extension y el archivo original tiene una, se la anadimos
     if not Path(new_name).suffix and path.suffix:
         new_name += path.suffix
 
-    # Sanitizar el nombre del archivo final
-    new_name = re.sub(r'[\x00/\\:*?"<>|]', '_', new_name)
+    # Limite de nombre de la mayoria de sistemas de archivos (255 bytes),
+    # recortando el cuerpo y respetando la extension.
+    if len(new_name.encode("utf-8", "ignore")) > 255:
+        suffix = Path(new_name).suffix[:32]
+        body = new_name[: len(new_name) - len(Path(new_name).suffix)]
+        while len((body + suffix).encode("utf-8", "ignore")) > 255 and body:
+            body = body[:-1]
+        new_name = (body or "archivo") + suffix
+
     return new_name
 
 
-def resolve_destination_folder(path: Path) -> tuple[str, str, str | None]:
-    """Devuelve (categoria, carpeta_relativa_a_home, rename_pattern) para un archivo dado."""
-    ext = path.suffix.lower().lstrip(".")
+def resolve_destination_folder(path: Path, rules: list[dict] | None = None) -> tuple[str, str, str | None]:
+    """Devuelve (categoria, carpeta_relativa_a_home, rename_pattern) para un archivo dado.
 
-    # Buscar en todas las reglas personalizadas (incluyendo condicionales)
-    rules = db.list_rules()
+    'rules' permite reutilizar las reglas ya leidas durante un barrido completo
+    en vez de consultar la base de datos una vez por archivo.
+    """
+    ext = path.suffix.lower().lstrip(".")
+    if rules is None:
+        rules = db.list_rules()
+
+    # Una sola cache de datos costosos para todas las reglas del archivo.
+    facts = FileFacts(path, ext)
+
     for rule in rules:
         rule_ext = rule.get("extension")
         # Si la regla especifica una extension concreta (y no es wildcard *), debe coincidir
         if rule_ext and rule_ext != "*" and rule_ext != ext:
             continue
         # Comprobar condiciones (AND)
-        if check_conditions(path, ext, rule.get("conditions")):
+        if check_conditions(path, ext, rule.get("conditions"), facts=facts):
             return "regla personalizada", rule["destination"], rule.get("rename_pattern")
 
     # Clasificar con el categorizador inteligente
@@ -384,17 +599,18 @@ def is_destination_or_reserved_dir(path: Path) -> bool:
         return True
     if is_temporary_download_file(path):
         return True
-    if path.name in ("node_modules", ".venv", "__pycache__", ".git", "scratch", "dist", "build"):
+    if path.name in RESERVED_DIR_NAMES:
         return True
 
     try:
         resolved = path.resolve()
         if resolved in (HOME_DIR.resolve(), DOWNLOADS_DIR.resolve()):
             return True
+        if resolved in PROTECTED_PATHS:
+            return True
 
-        scan_dirs = get_default_scan_dirs()
-        for d in scan_dirs:
-            if resolved == d.resolve():
+        for d in get_cached_scan_dirs():
+            if resolved == d:
                 return True
     except (OSError, ValueError):
         pass
@@ -402,24 +618,38 @@ def is_destination_or_reserved_dir(path: Path) -> bool:
     return False
 
 
-def organize_folder(path: Path) -> dict | None:
+def organize_folder(path: Path, rules: list[dict] | None = None) -> dict | None:
     """Mueve una carpeta completa a su destino según reglas o clasificación."""
     if not path.exists() or not path.is_dir():
         return None
 
-    if is_destination_or_reserved_dir(path):
+    # Nunca seguir un enlace simbolico: moverlo arrastraria la carpeta real,
+    # que puede estar en cualquier sitio del sistema.
+    if path.is_symlink():
+        return None
+
+    if is_destination_or_reserved_dir(path) or is_protected_path(path):
         return None
 
     if is_file_in_use(path):
         return None
 
-    category, relative_folder, rename_pattern = resolve_destination_folder(path)
+    category, relative_folder, rename_pattern = resolve_destination_folder(path, rules=rules)
     dest_dir = safe_destination_dir(relative_folder)
     if dest_dir is None:
         logger.warning("destino invalido %r para carpeta %s; no se mueve", relative_folder, path.name)
         return None
 
-    if dest_dir.resolve() == path.parent.resolve() or dest_dir.resolve() == path.resolve():
+    dest_resolved = dest_dir.resolve()
+    path_resolved = path.resolve()
+    if dest_resolved in (path.parent.resolve(), path_resolved):
+        return None
+    # Mover una carpeta dentro de si misma la destruiria (o fallaria a medias
+    # dejando el contenido partido).
+    if path_resolved in dest_resolved.parents:
+        logger.warning(
+            "destino %s esta dentro de la carpeta %s; no se mueve", dest_resolved, path_resolved
+        )
         return None
 
     topic_name = category.split(": ", 1)[1] if category.startswith("tema: ") else None
@@ -456,20 +686,29 @@ def organize_folder(path: Path) -> dict | None:
     }
 
 
-def organize_file(path: Path) -> dict | None:
+def organize_file(path: Path, rules: list[dict] | None = None) -> dict | None:
     """Mueve un archivo o carpeta a su ubicación correspondiente. Devuelve info del
     movimiento, o None si no se movio (ya no existe, destino invalido,
-    o ya esta en su carpeta de destino)."""
+    o ya esta en su carpeta de destino).
+
+    'rules' evita releer las reglas de la base de datos en cada archivo cuando
+    se organiza un directorio entero.
+    """
     if not path.exists():
         return None
 
     if path.is_dir():
-        return organize_folder(path)
+        return organize_folder(path, rules=rules)
+
+    # Un enlace simbolico se moveria a si mismo dejando el enlace roto, o
+    # peor: apuntando fuera de la carpeta personal.
+    if path.is_symlink():
+        return None
 
     if not path.is_file():
         return None
 
-    if is_temporary_download_file(path):
+    if is_temporary_download_file(path) or is_protected_path(path):
         return None
 
     try:
@@ -493,33 +732,32 @@ def organize_file(path: Path) -> dict | None:
         else:
             folder_name = path.stem
 
-        extract_dir = path.parent / (folder_name or f"{path.name}_extraido")
+        with _move_lock:
+            extract_dir = _unique_destination(path.parent, folder_name or f"{path.name}_extraido")
         try:
             unpack_archive(path, extract_dir)
-            source_str = str(path)
-            path.unlink()
+            # El comprimido NO se borra: antes se hacia path.unlink() y luego
+            # "Deshacer" solo renombraba la carpeta extraida a "algo.zip", asi
+            # que el archivo original era irrecuperable. Ahora se archiva de
+            # forma normal (movimiento reversible) y la extraccion se registra
+            # como evento no reversible aparte.
             db.log_move(
                 filename=path.name,
-                source=source_str,
+                source=str(path),
                 destination=str(extract_dir),
                 category="desempaquetado",
+                undoable=False,
             )
-            return {
-                "filename": path.name,
-                "source": source_str,
-                "destination": str(extract_dir),
-                "category": "desempaquetado",
-            }
+            logger.info("desempaquetado %s en %s", path.name, extract_dir)
         except Exception as exc:
             logger.warning("no se pudo desempaquetar %s, continuando clasificacion normal: %s", path.name, exc)
             if extract_dir.exists() and extract_dir.is_dir():
                 try:
-                    if not any(extract_dir.iterdir()):
-                        extract_dir.rmdir()
+                    shutil.rmtree(extract_dir)
                 except OSError:
-                    pass
+                    logger.debug("no se pudo limpiar %s tras un desempaquetado fallido", extract_dir)
 
-    category, relative_folder, rename_pattern = resolve_destination_folder(path)
+    category, relative_folder, rename_pattern = resolve_destination_folder(path, rules=rules)
 
     dest_dir = safe_destination_dir(relative_folder)
     if dest_dir is None:
@@ -538,12 +776,26 @@ def organize_file(path: Path) -> dict | None:
     with _move_lock:
         destination = dest_dir / dest_filename
         if destination.exists():
-            if destination.stat().st_size == path.stat().st_size and calculate_sha256(destination) == calculate_sha256(path):
+            # stat() puede fallar si otro worker mueve o borra el destino justo
+            # entre el exists() y esta linea: se trata como "no es duplicado".
+            try:
+                is_identical = (
+                    destination.is_file()
+                    and destination.stat().st_size == path.stat().st_size
+                    and calculate_sha256(destination) == calculate_sha256(path)
+                )
+            except OSError:
+                is_identical = False
+
+            if is_identical:
                 action = db.get_setting("duplicate_action", "suffix")
                 if action == "delete_source":
                     try:
-                        path.unlink()
-                        logger.info("Eliminado duplicado en origen: %s (ya existe identico en destino)", path.name)
+                        # A la papelera, nunca unlink(): "el destino ya tiene
+                        # una copia identica" es una comparacion por hash, pero
+                        # un borrado equivocado aqui seria irrecuperable.
+                        trash.move_to_trash(path)
+                        logger.info("Duplicado enviado a la papelera: %s (ya existe identico en destino)", path.name)
                     except OSError as exc:
                         logger.error("error eliminando duplicado %s: %s", path.name, exc)
                     return None
@@ -584,8 +836,14 @@ def organize_directory(directory: Path) -> list[dict]:
     moved = []
     if not directory.exists():
         return moved
+
+    # Se leen las reglas UNA vez por barrido. Antes se consultaba la base de
+    # datos (abriendo una conexion nueva) por cada archivo, que era el cuello
+    # de botella al organizar carpetas grandes.
+    rules = db.list_rules()
+
     for entry in sorted(directory.iterdir()):
-        if entry.name.startswith("."):
+        if entry.name.startswith(".") or entry.is_symlink():
             continue
         if entry.is_file():
             if is_temporary_download_file(entry) or is_file_in_use(entry):
@@ -595,13 +853,13 @@ def organize_directory(directory: Path) -> list[dict]:
                     continue
             except OSError:
                 continue
-            result = organize_file(entry)
+            result = organize_file(entry, rules=rules)
             if result:
                 moved.append(result)
         elif entry.is_dir():
             if is_destination_or_reserved_dir(entry) or is_file_in_use(entry):
                 continue
-            result = organize_folder(entry)
+            result = organize_folder(entry, rules=rules)
             if result:
                 moved.append(result)
     return moved
@@ -616,11 +874,25 @@ def undo_move(move_id: int) -> tuple[dict | None, str | None]:
     if move["undone_at"]:
         return None, "este movimiento ya fue deshecho anteriormente"
 
+    # Un desempaquetado o un borrado de mantenimiento no son movimientos: no
+    # hay nada que devolver a su sitio. Antes se intentaba igualmente, con
+    # resultados absurdos (una carpeta renombrada a "algo.zip", o un
+    # Path("DELETED") interpretado como ruta relativa al directorio de trabajo).
+    if not move.get("undoable", 1):
+        if move["category"] == "mantenimiento":
+            return None, "los borrados de mantenimiento se recuperan desde la papelera, no desde el historial"
+        return None, "esta accion no se puede deshacer desde el historial"
+
     dest_path = Path(move["destination"])
     orig_path = Path(move["source"])
 
     if not dest_path.exists():
         return None, f"el archivo ya no esta en su carpeta de destino ({dest_path.name})"
+
+    # El origen se guardo como ruta absoluta cuando se hizo el movimiento; se
+    # vuelve a validar por si la base de datos fue manipulada.
+    if resolve_safe_path(str(orig_path)) is None:
+        return None, "la carpeta de origen registrada esta fuera de tu carpeta personal"
 
     orig_dir = orig_path.parent
     try:
@@ -662,38 +934,94 @@ def run_maintenance_cleanup() -> list[dict]:
             logger.warning("Ruta de mantenimiento invalida o insegura: %s", folder_str)
             continue
 
+        # Una regla sobre "~", "~/.config" o similar borraria la configuracion
+        # entera del usuario. Se rechaza aunque este guardada en la BD.
+        if is_protected_path(resolved_dir):
+            logger.error(
+                "Regla de mantenimiento sobre una ruta protegida (%s); se ignora", resolved_dir
+            )
+            continue
+
         # 3. Recorrer de forma recursiva
         for root, dirs, files in os.walk(resolved_dir):
+            # No entrar en carpetas ocultas ni reservadas: ahi viven las
+            # configuraciones de otras aplicaciones, no archivos caducables.
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".")
+                and d not in RESERVED_DIR_NAMES
+                and not (Path(root) / d).is_symlink()
+            ]
+
             for file in files:
                 file_path = Path(root) / file
+                if file.startswith("."):
+                    continue  # dotfiles: configuracion, no basura caducable
+                if file_path.is_symlink():
+                    continue
                 # Segunda validacion de seguridad para cada archivo recorrido (evitar escape por enlaces simbolicos o similares)
                 resolved_file_path = resolve_safe_path(str(file_path))
-                if not resolved_file_path:
+                if not resolved_file_path or is_protected_path(resolved_file_path):
                     continue
-                
+
                 try:
                     stat_info = resolved_file_path.stat()
                     # Comprobar la edad
-                    age_seconds = current_time - stat_info.st_mtime
-                    age_days = age_seconds / 86400
-                    if age_days > max_age_days:
-                        # Eliminar el archivo
-                        resolved_file_path.unlink()
-                        # Registrar en moves_log
-                        db.log_move(
-                            filename=resolved_file_path.name,
-                            source=str(resolved_file_path),
-                            destination="DELETED",
-                            category="mantenimiento"
-                        )
-                        deleted_files.append({
-                            "filename": resolved_file_path.name,
-                            "path": str(resolved_file_path),
-                            "age_days": round(age_days, 2)
-                        })
-                        logger.info("Archivo de mantenimiento eliminado: %s (edad: %.2f dias)", resolved_file_path, age_days)
+                    age_days = (current_time - stat_info.st_mtime) / 86400
+                    if age_days <= max_age_days:
+                        continue
+
+                    # A la PAPELERA, no unlink(): una regla mal configurada no
+                    # puede destruir documentos de forma irreversible.
+                    outcome = trash.move_to_trash(resolved_file_path)
+                    db.log_move(
+                        filename=resolved_file_path.name,
+                        source=str(resolved_file_path),
+                        destination=f"papelera:{outcome['method']}",
+                        category="mantenimiento",
+                        undoable=False,
+                    )
+                    deleted_files.append({
+                        "filename": resolved_file_path.name,
+                        "path": str(resolved_file_path),
+                        "age_days": round(age_days, 2),
+                        "trash_method": outcome["method"],
+                        "trash_id": outcome["entry_id"],
+                    })
+                    logger.info(
+                        "Mantenimiento: %s enviado a la papelera (edad: %.2f dias)",
+                        resolved_file_path, age_days,
+                    )
                 except OSError as exc:
                     logger.error("Error al procesar/eliminar %s en mantenimiento: %s", file_path, exc)
 
+        _remove_empty_dirs(resolved_dir)
+
+    # Purga lo que ya haya caducado en la papelera propia de Martix.
+    try:
+        trash.purge()
+    except Exception:
+        logger.debug("no se pudo purgar la papelera", exc_info=True)
+
     return deleted_files
+
+
+def _remove_empty_dirs(root: Path) -> None:
+    """Elimina las carpetas que quedaron vacias tras el barrido (nunca la raiz).
+
+    Sin esto, el mantenimiento dejaba un esqueleto de carpetas vacias creciendo
+    indefinidamente.
+    """
+    for current, dirs, files in os.walk(root, topdown=False):
+        current_path = Path(current)
+        if current_path == root or current_path.is_symlink():
+            continue
+        if is_protected_path(current_path):
+            continue
+        try:
+            if not any(current_path.iterdir()):
+                current_path.rmdir()
+                logger.debug("carpeta vacia eliminada: %s", current_path)
+        except OSError:
+            continue
 

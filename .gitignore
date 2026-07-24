@@ -1,10 +1,52 @@
-backend/.venv/
-**/__pycache__/
-*.pyc
-database/sortix.db
-database/martix.db
+# --- Datos del usuario: NUNCA deben subirse -------------------------------
+# La base de datos contiene rutas reales, nombres de archivos personales y el
+# historial completo de lo que se ha organizado.
+database/*.db
+database/*.db-wal
+database/*.db-shm
+
+# .env puede contener MARTIX_TOKEN. El ejemplo (.env.example) sí se sube.
 backend/.env
-.claude/
+.env
+.env.local
+.env.*.local
+
+# --- Entornos y artefactos de Python --------------------------------------
+backend/.venv/
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Empaquetado ----------------------------------------------------------
 backend/build/
 backend/dist/
+build/
+dist/
 *.spec
+
+# --- Editores y sistemas operativos ---------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Herramientas de agentes ----------------------------------------------
+.claude/
+CLAUDE.md
+AGENTS.md
+
+# --- Temporales -----------------------------------------------------------
+scratch/
+tmp/
+*.log

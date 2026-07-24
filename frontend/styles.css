@@ -1526,3 +1526,31 @@ input:checked + .slider:before {
     color: #ffffff !important;
 }
 
+
+/* Orden de evaluación de las reglas: la primera que coincide es la que gana,
+   así que el número es información funcional, no decorativa. */
+.rule-order-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    margin-right: 0.4rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--color-surface-alt, rgba(127, 127, 127, 0.18));
+    color: var(--color-text-muted, #64748b);
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.icon-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+#disk-analyzer-status.warning {
+    color: #b45309;
+    font-weight: 600;
+}

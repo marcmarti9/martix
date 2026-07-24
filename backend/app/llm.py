@@ -53,6 +53,20 @@ def suggest_subfolder(filename: str, content_excerpt: str, category_folder: str)
     if not LLM_ENABLED:
         return None
 
+    # Barrera de privacidad. Aqui viaja un fragmento del CONTENIDO del
+    # documento (puede ser un extracto bancario o un contrato). LLM_URL sale
+    # de .env, asi que un fichero mal copiado de un tutorial bastaria para
+    # exfiltrarlo a un tercero en silencio: se comprueba en cada llamada que
+    # el destino sigue siendo este mismo equipo.
+    from app.security import is_loopback_url
+    if not is_loopback_url(LLM_URL):
+        logger.error(
+            "MARTIX_LLM_URL apunta fuera de este equipo (%s). Martix no enviara el contenido "
+            "de tus documentos a un servidor remoto; corrige backend/.env o desactiva MARTIX_LLM.",
+            LLM_URL,
+        )
+        return None
+
     prompt = _PROMPT.format(
         filename=filename,
         excerpt=(content_excerpt or "")[:MAX_EXCERPT_CHARS],

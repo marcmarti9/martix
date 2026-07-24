@@ -42,16 +42,29 @@ def resolve_safe_path(raw_path: str) -> Path | None:
 
 
 def list_directory(resolved: Path) -> list[dict]:
+    """Lista una carpeta ocultando lo que Martix nunca debe exponer.
+
+    El explorador es un mapa de la carpeta personal, y devolverlo entero
+    significaba listar ~/.ssh, ~/.aws o ~/.gnupg: los nombres de archivo por si
+    solos ya dicen a un atacante donde estan las claves.
+    """
+    from app.security import is_protected_path
+
     entries = []
     for entry in sorted(resolved.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
+        if is_protected_path(entry):
+            continue
         try:
+            # No seguir enlaces: su tamano y fecha son los del destino, que
+            # puede estar en cualquier parte del sistema.
             stat = entry.stat()
+            is_dir = entry.is_dir()
         except OSError:
             continue
         entries.append({
             "name": entry.name,
-            "is_dir": entry.is_dir(),
-            "path": _path_to_key(entry.resolve()) if entry.is_dir() else None,
+            "is_dir": is_dir,
+            "path": _path_to_key(entry.resolve()) if is_dir else None,
             "size": stat.st_size if entry.is_file() else None,
             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
             "ext": entry.suffix.lower().lstrip(".") if entry.is_file() else "",

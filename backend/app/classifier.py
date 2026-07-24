@@ -5,6 +5,7 @@ archivo. Mira primero el nombre del archivo y, si hace falta, el contenido
 
 import re
 import unicodedata
+import warnings
 import xml.etree.ElementTree as ET
 import zipfile
 import shutil
@@ -21,10 +22,34 @@ try:
 except ImportError:
     _OCR_AVAILABLE = False
 
+# Bomba de descompresion de imagen: un PNG de pocos KB puede declarar
+# dimensiones enormes y hacer que PIL reserve gigabytes al decodificarlo.
+# Martix abre imagenes que vienen de descargas (OCR y EXIF), asi que se baja
+# el limite y se convierte el aviso de PIL en una excepcion de verdad.
+MAX_IMAGE_PIXELS = 64_000_000  # ~8000x8000, de sobra para cualquier foto real
+try:
+    from PIL import Image as _PILImage
+    _PILImage.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    warnings.simplefilter("error", _PILImage.DecompressionBombWarning)
+except Exception:  # pragma: no cover - Pillow no instalado
+    pass
+
 
 MAX_CONTENT_CHARS = 20_000  # suficiente para detectar el tema sin leer el pdf entero
 PDF_PAGES_TO_SCAN = 6
 MIN_KEYWORD_HITS = 1
+
+# Tope de tamano de los archivos que se abren para leer su contenido. PdfReader
+# analiza la estructura del PDF ENTERO antes de que el limite de paginas surta
+# efecto, asi que un PDF hostil de 2 GB podria colgar un worker del watcher.
+MAX_PARSEABLE_FILE_BYTES = 256 * 1024 * 1024
+
+
+def _within_size_limit(path: Path) -> bool:
+    try:
+        return path.stat().st_size <= MAX_PARSEABLE_FILE_BYTES
+    except OSError:
+        return False
 
 _categories = load_categories()
 
@@ -51,6 +76,8 @@ def normalize(text: str) -> str:
 
 
 def _extract_pdf_text(path: Path) -> str:
+    if not _within_size_limit(path):
+        return ""
     try:
         from pypdf import PdfReader
     except ImportError:
@@ -70,24 +97,129 @@ def _extract_pdf_text(path: Path) -> str:
     return "".join(chunks)[:MAX_CONTENT_CHARS]
 
 
-def _extract_docx_text(path: Path) -> str:
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_W_TEXT_TAG = f"{{{_W_NS}}}t"
+
+# Tope de bytes descomprimidos que se leen de un .docx (proteccion zip-bomb).
+MAX_DOCX_BYTES = 8 * 1024 * 1024
+_DOCX_CHUNK = 64 * 1024
+
+# Defensa en profundidad frente a XXE / Billion Laughs. El parser de la
+# biblioteca estandar no descarga entidades externas, y ademas rechazamos
+# cualquier DTD por nuestra cuenta, pero si defusedxml esta instalado se usa
+# porque prohibe DTDs y expansion de entidades a nivel de parser.
+try:
+    from defusedxml.ElementTree import iterparse as _DEFUSED_ITERPARSE
+except Exception:  # pragma: no cover - depende del entorno
+    _DEFUSED_ITERPARSE = None
+
+
+class _LimitedReader:
+    """Envuelve un stream para no leer jamas mas de `limit` bytes
+    descomprimidos: un .docx de 30 KB no puede expandirse a gigabytes."""
+
+    def __init__(self, stream, limit: int):
+        self._stream = stream
+        self._remaining = limit
+
+    def read(self, size: int = -1) -> bytes:
+        if self._remaining <= 0:
+            return b""
+        if size is None or size < 0:
+            size = self._remaining
+        chunk = self._stream.read(min(size, self._remaining))
+        self._remaining -= len(chunk)
+        return chunk
+
+
+def _extract_docx_text_defused(path: Path) -> str:
+    """Variante con defusedxml: prohibe DTD y entidades a nivel de parser."""
+    if not _within_size_limit(path):
+        return ""
+    texts: list[str] = []
+    total = 0
     try:
         with zipfile.ZipFile(path) as zf:
-            with zf.open("word/document.xml") as f:
-                xml_content = f.read(MAX_CONTENT_CHARS)
-                # Prevencion de DoS / XML Entity Explosion (Billion Laughs / XXE):
-                # un docx legitimo nunca contiene DTDs (<!DOCTYPE o <!ENTITY).
-                if b"<!DOCTYPE" in xml_content or b"<!ENTITY" in xml_content:
-                    return ""
-                root = ET.fromstring(xml_content)
+            if "word/document.xml" not in zf.namelist():
+                return ""
+            with zf.open("word/document.xml") as raw:
+                stream = _LimitedReader(raw, MAX_DOCX_BYTES)
+                for _event, elem in _DEFUSED_ITERPARSE(stream, events=("end",),
+                                                       forbid_dtd=True,
+                                                       forbid_entities=True,
+                                                       forbid_external=True):
+                    if elem.tag == _W_TEXT_TAG and elem.text:
+                        texts.append(elem.text)
+                        total += len(elem.text)
+                    elem.clear()
+                    if total >= MAX_CONTENT_CHARS:
+                        break
     except Exception:
+        return " ".join(texts)[:MAX_CONTENT_CHARS]
+    return " ".join(texts)[:MAX_CONTENT_CHARS]
+
+
+def _extract_docx_text(path: Path) -> str:
+    """Extrae el texto de un .docx leyendo document.xml en streaming.
+
+    Antes se hacia f.read(20_000) y luego ET.fromstring() sobre ese trozo:
+    en cualquier documento real (>20 KB de XML, que son unas pocas paginas)
+    el XML quedaba cortado a mitad, el parseo fallaba y se devolvia "". Es
+    decir, la clasificacion por contenido de .docx no funcionaba nunca.
+
+    Ahora se alimenta un parser incremental hasta juntar MAX_CONTENT_CHARS de
+    texto, y si el documento estuviera danado se devuelve lo leido hasta ese
+    punto en vez de nada.
+    """
+    if _DEFUSED_ITERPARSE is not None:
+        return _extract_docx_text_defused(path)
+
+    if not _within_size_limit(path):
         return ""
-    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-    texts = [node.text for node in root.iter("{%s}t" % ns["w"]) if node.text]
+
+    texts: list[str] = []
+    total_chars = 0
+    read_bytes = 0
+
+    def _harvest(parser: ET.XMLPullParser) -> None:
+        nonlocal total_chars
+        for _event, elem in parser.read_events():
+            if elem.tag == _W_TEXT_TAG and elem.text:
+                texts.append(elem.text)
+                total_chars += len(elem.text)
+            # liberar memoria: los documentos largos generan miles de nodos
+            elem.clear()
+
+    try:
+        with zipfile.ZipFile(path) as zf:
+            if "word/document.xml" not in zf.namelist():
+                return ""
+            parser = ET.XMLPullParser(["end"])
+            with zf.open("word/document.xml") as f:
+                previous_tail = b""
+                while total_chars < MAX_CONTENT_CHARS and read_bytes < MAX_DOCX_BYTES:
+                    chunk = f.read(_DOCX_CHUNK)
+                    if not chunk:
+                        break
+                    read_bytes += len(chunk)
+                    # Prevencion de XXE / Billion Laughs: un .docx legitimo no
+                    # lleva DTD. El solape evita que se cuele partiendo la
+                    # cadena entre dos lecturas.
+                    if b"<!DOCTYPE" in previous_tail + chunk or b"<!ENTITY" in previous_tail + chunk:
+                        return ""
+                    previous_tail = chunk[-16:]
+                    parser.feed(chunk)
+                    _harvest(parser)
+    except Exception:
+        # documento corrupto o truncado: devolvemos lo que se pudo leer
+        return " ".join(texts)[:MAX_CONTENT_CHARS]
+
     return " ".join(texts)[:MAX_CONTENT_CHARS]
 
 
 def _extract_txt_text(path: Path) -> str:
+    if not _within_size_limit(path):
+        return ""
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
             return f.read(MAX_CONTENT_CHARS)
@@ -95,15 +227,32 @@ def _extract_txt_text(path: Path) -> str:
         return ""
 
 
+_OCR_EXTENSIONS = ("png", "jpg", "jpeg", "tiff", "bmp", "gif")
+
+
 def _extract_image_text(path: Path) -> str:
-    if not _OCR_AVAILABLE:
+    if not _OCR_AVAILABLE or not _within_size_limit(path):
         return ""
     try:
-        img = Image.open(path)
-        text = pytesseract.image_to_string(img, timeout=10)
-        return text[:MAX_CONTENT_CHARS]
+        # context manager: sin el, cada imagen analizada dejaba un descriptor
+        # de archivo abierto hasta la siguiente pasada del recolector.
+        with Image.open(path) as img:
+            return pytesseract.image_to_string(img, timeout=10)[:MAX_CONTENT_CHARS]
     except Exception:
         return ""
+
+
+def content_is_extractable(ext: str) -> bool:
+    """Si Martix sabe leer el contenido de esta extension.
+
+    Distinguir "no se pudo leer" de "se leyo y estaba vacio" es imprescindible
+    para las condiciones: '' significaba que una condicion
+    `content not_contains X` casaba con TODOS los binarios (mp4, xlsx, zip...)
+    porque "" nunca contiene nada.
+    """
+    if ext in ("pdf", "docx", "txt"):
+        return True
+    return ext in _OCR_EXTENSIONS and _OCR_AVAILABLE
 
 
 def _extract_content(path: Path, ext: str) -> str:
@@ -113,7 +262,7 @@ def _extract_content(path: Path, ext: str) -> str:
         return _extract_docx_text(path)
     if ext == "txt":
         return _extract_txt_text(path)
-    if ext in ("png", "jpg", "jpeg", "tiff", "bmp", "gif"):
+    if ext in _OCR_EXTENSIONS:
         return _extract_image_text(path)
     return ""
 
@@ -143,23 +292,25 @@ def _best_topic_for_text(text: str, topics: list[dict]) -> dict | None:
     return best_topic if best_hits >= MIN_KEYWORD_HITS else None
 
 
-def detect_topic(path: Path, ext: str, topics: list[dict]) -> dict | None:
-    """Intenta identificar a que Tema pertenece un documento: primero por el
-    nombre del archivo (rapido), y si no hay pista, por su contenido."""
+def detect_topic(path: Path, ext: str, topics: list[dict]) -> tuple[dict | None, str]:
+    """Identifica a que Tema pertenece un documento: primero por el nombre del
+    archivo (rapido) y, si no hay pista, por su contenido.
+
+    Devuelve (tema, contenido_leido) para que quien llame pueda reutilizar el
+    texto extraido (p. ej. el LLM) sin volver a abrir y parsear el archivo.
+    """
     if not topics:
-        return None
+        return None, ""
 
     topic = _best_topic_for_text(path.stem, topics)
     if topic:
-        return topic
+        return topic, ""
 
     if ext in _CONTENT_EXTENSIONS:
         content = _extract_content(path, ext)
-        topic = _best_topic_for_text(content, topics)
-        if topic:
-            return topic
+        return _best_topic_for_text(content, topics), content
 
-    return None
+    return None, ""
 
 
 def _match_subcategory(category: str, stem: str) -> dict | None:
@@ -240,17 +391,19 @@ def classify(path: Path) -> dict:
 
     ext = path.suffix.lower().lstrip(".")
     category = _EXT_TO_CATEGORY.get(ext, "other")
+    if category not in _categories["categories"]:
+        category = "other"
 
     content = ""
     if ext in _CONTENT_EXTENSIONS:
-        topics = db.list_topics()
-        if topics:
-            topic = _best_topic_for_text(path.stem, topics)
-            if topic is None:
-                content = _extract_content(path, ext)
-                topic = _best_topic_for_text(content, topics)
-            if topic:
-                return {"category": f"tema: {topic['name']}", "topic": topic["name"], "folder": topic["destination"], "rename_pattern": topic.get("rename_pattern")}
+        topic, content = detect_topic(path, ext, db.list_topics())
+        if topic:
+            return {
+                "category": f"tema: {topic['name']}",
+                "topic": topic["name"],
+                "folder": topic["destination"],
+                "rename_pattern": topic.get("rename_pattern"),
+            }
 
     sub = _match_subcategory(category, path.stem)
     if sub:
@@ -287,6 +440,8 @@ def extract_metadata(path: Path) -> dict[str, str | None]:
 
     # EXIF para .jpg, .jpeg, .png, .webp, .tiff
     if ext in ("jpg", "jpeg", "png", "webp", "tiff"):
+        if not _within_size_limit(path):
+            return res
         try:
             from PIL import Image, ExifTags
             with Image.open(path) as img:
@@ -405,8 +560,3 @@ def extract_metadata(path: Path) -> dict[str, str | None]:
             pass
 
     return res
-
-
-def check_conditions(path: Path, ext: str, conditions_str: str | None) -> bool:
-    from app.organizer import check_conditions as _check_conditions
-    return _check_conditions(path, ext, conditions_str)

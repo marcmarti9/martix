@@ -4,3 +4,11 @@ pypdf>=4.0,<6.0
 pytesseract>=0.3.10
 Pillow>=10.0.0
 mutagen>=1.47.0
+
+# Papelera nativa del escritorio: ningun borrado de Martix es definitivo.
+# Si falta, se usa la cuarentena propia en la carpeta de datos (app/trash.py).
+Send2Trash>=1.8
+
+# Endurece el parseo de XML de los .docx frente a XXE / billion laughs.
+# Si falta, se usa el parser estandar con rechazo explicito de DTD.
+defusedxml>=0.7

@@ -1,190 +1,168 @@
+<h1 align="center">Martix</h1>
+
+<p align="center"><strong>Real-time, private, and 100% local smart file organizer and disk space analyzer.</strong></p>
+
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
-  <img src="https://img.shields.io/badge/Flask-3.0%2B-black?style=for-the-badge&logo=flask&logoColor=white" alt="Flask" />
-  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=for-the-badge" alt="Platforms" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
+  Martix runs silently in the background, monitors your Downloads folder, and automatically archives incoming files—powered by visual rules, content extraction, local OCR, or an optional local LLM running directly on your machine. Nothing leaves your computer. No file deletion is ever permanent.
 </p>
 
-<h1 align="center">Martix</h1>
-<p align="center"><strong>An intelligent, privacy-first, real-time file organizer for your desktop.</strong></p>
-<p align="center">Martix runs quietly in the background, monitoring your Downloads and custom folders. It automatically classifies and files incoming documents, media, and archives using visual Scratch-like rules, content OCR, EXIF/ID3 metadata, or an optional 100% local LLM.</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+" />
+  <img src="https://img.shields.io/badge/Flask-3.0%2B-black?style=flat-square&logo=flask&logoColor=white" alt="Flask 3" />
+  <img src="https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="Platforms" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/telemetry-zero-success?style=flat-square" alt="Zero Telemetry" />
+</p>
 
 ---
 
-## 💡 Why Martix?
+## Why Martix?
 
-Let’s be honest: your Downloads folder is probably an endless dumping ground of PDFs, invoices, screenshots, zip files, and music downloads. Manually moving them takes time, and cloud-based file organizers compromise your privacy.
+Your Downloads folder is often a chaotic dump: invoices, screenshots, ZIP archives, bank statements, and audio files. Manual organization is tedious and time-consuming, while cloud-based file management tools require uploading private documents to external servers.
 
-Martix handles sensitive personal files (tax returns, bank statements, contracts, photos) right on your machine. It is designed **privacy-first from day one**:
+Martix performs all organization locally on your device. No user accounts, no external servers, and zero telemetry.
 
-* **100% Local Execution:** Zero cloud dependencies, zero telemetry, and zero external API calls. Your documents never leave your localhost.
-* **Smart Content Classification:** Deep scans text in PDF, DOCX, and TXT files, and performs local OCR on images using Tesseract.
-* **Strict Security Controls:** Safe path resolution strictly confined to your home directory (`~`), built-in anti-loop guards, anti-Zip-Slip protections for archives, and local API token protection.
+**Strict Core Guarantee: No file deletion is permanent.** Everything deleted by Martix is safely dispatched to your system trash (or a local quarantine directory if unavailable). An application with permissions over your personal user directory must never perform irreversible actions.
 
 ---
 
-## ✨ Features at a Glance
+## Key Features
 
-### 🚀 Real-Time Automation & Multi-Folder Patrol
-* **Multi-Folder Real-Time Monitoring:** Monitors your Downloads directory and any active custom folders simultaneously in real-time. Safely waits for active downloads (`.crdownload`, `.part`) to complete before filing.
-* **Background Task Scheduler:** Automatically runs periodic folder sweeps and scheduled auto-trash cleanups in the background without blocking the UI.
-* **Native Desktop Notifications:** Sends non-intrusive system notifications whenever a file is filed or organized.
+### Automated Real-Time Archiving
 
-### 🧠 Smart Classification & Learning
-* **Visual Scratch-Style Rule Builder:** Combine filename, extension, file size, age (`age_days`), and content conditions with AND logic.
-* **Smart Learning from Corrections:** Corrected a file placement manually? Martix analyzes the correction (via heuristic patterns or your optional local Ollama LLM) and suggests a new rule with a single click.
-* **Archive Handling (.zip / .tar):** Safely unpacks compressed archives in temporary sandboxes with Zip-Slip protection to analyze and organize internal contents.
-* **EXIF & ID3 Tag Metadata:** Filter and rename files using photo EXIF data (camera model, capture date) and audio ID3 tags (artist, album, song title, year).
-* **Dynamic Placeholders:** Custom file renaming templates using tags like `{YYYY}`, `{Topic}`, `{ARTIST}`, `{ALBUM}`, `{EXIF_DATE}`, and `{OriginalName}`.
+Monitors your Downloads and user-selected folders in real time. Martix waits until downloads are fully settled—verifying file size stability and confirming no process holds an active write lock—before processing. Full directories (e.g., downloaded photo albums) are organized atomically as single units.
 
-### 🛠️ Utilities & Desktop Experience
-* **📊 Disk Space Visualizer:** Scan drives or folders to visualize space usage. Includes folder tree hierarchy (% of parent bars), file extension breakdown, and an interactive HTML5 Canvas squarified treemap visualizer with 1-click file deletion.
-* **⚡ 1-Click Installer & System Integration:** Run `./install.sh` to install Martix, register desktop app launchers, configure login autostart, enable background systemd services, and install the `martix` CLI terminal command.
-* **Fast 2-Step Deduplication:** Quickly detects duplicate files across any selected directory using a lightweight 2-pass hashing approach (64KB fast-hash + full SHA256 verification).
-* **Export & Import Rules:** Export your custom classification and maintenance rules to JSON files to share or backup.
-* **Dry-Run Simulation:** Test how your rules will handle existing files before committing any actual moves.
-* **1-Level Undo:** Accidental move? Undo filing actions directly from your History log.
-* **Standalone Desktop App & 1-Click Packaging:** Run as a native desktop window via `pywebview` or package into a standalone binary using the built-in PyInstaller builder script.
+### Intelligent Content Classification
+
+Martix evaluates incoming files using a priority cascade:
+
+```
+1. Custom User Rules     → e.g., "PDF containing 'invoice' → Documents/Invoices"
+2. User Topics           → Keyword matching on filename and full text content
+                           (PDF, DOCX, TXT, plus images via local Tesseract OCR)
+3. Subcategories         → Pattern matching (screenshots, receipts, resumes, etc.)
+4. Local LLM (Optional)  → Ollama running locally suggests an appropriate folder
+5. Base Category         → Extension fallback as final resort
+```
+
+### Flexible Priority Rules
+
+Multiple rules per extension with combined `AND` conditions over file name, size, age, text content, and metadata (EXIF/ID3). Drag-and-drop rule ordering ensures the highest-priority rule wins.
+
+```
+.pdf  +  content contains "invoice"       →  Documents/Invoices
+.pdf  +  content contains "contract"      →  Documents/Contracts
+.jpg  +  camera equals "NIKON Z6"        →  Photos/Reflex/{EXIF_DATE}
+ *    +  age > 365 days                  →  Archive/{FILE_YYYY}
+```
+
+### Additional System Capabilities
+
+- **Pattern-Based Dynamic Renaming** — Placeholders including `{YYYY}`, `{Topic}`, `{ARTIST}`, `{EXIF_DATE}`, `{OriginalName}`, and more.
+- **Visual Disk Space Analyzer** — Interactive tree hierarchy with parent percentage utilization, extension breakdown, and an interactive HTML5 Canvas squarified treemap.
+- **Fast Two-Phase Deduplication** — High-performance 64 KB fast-hash filtering followed by SHA256 verification to prevent unnecessary multi-gigabyte disk scans.
+- **Safe Archive Extraction** — Automatic ZIP/TAR extraction with strict Zip-Slip protection, expansion limits, and path traversal guards. Original archives are preserved.
+- **Scheduled Maintenance & Auto-Trash** — Automated age-based cleanup policies that route directly to trash.
+- **Dry-Run Simulation Mode** — Preview rule evaluations and destination paths before applying changes.
+- **One-Click Undo** — Revert moves directly from execution history logs.
+- **Adaptive Rule Suggestions** — Suggests new rules when manual file corrections are detected.
+- **Bilingual Interface** — English and Spanish UI with dark and light themes.
 
 ---
 
-## 🛠️ Getting Started
+## Installation
 
-### Prerequisites
-* **Python 3.10+**
-* (Optional) **Tesseract OCR** for image text scanning.
-* (Optional) **Ollama** (`MARTIX_LLM=1`) for local AI fallback suggestions.
+### Automatic Installation (Linux)
 
-### ⚡ 1-Click Installation & Desktop Integration
 ```bash
 git clone https://github.com/marcmarti9/martix.git
 cd martix
 ./install.sh
 ```
-This automatically sets up Python dependencies, registers the desktop app launcher, configures auto-start on login, enables the background service, and installs the `martix` CLI command.
 
-To uninstall at any time:
-```bash
-./uninstall.sh
-```
+`install.sh` builds the virtual environment, installs dependencies, registers application shortcuts, configures autostart/systemd services, and installs the global `martix` CLI command. To clean uninstall: `./uninstall.sh`.
 
-### Quick Manual Run
+### Manual Setup (Cross-Platform)
+
 ```bash
+git clone https://github.com/marcmarti9/martix.git
 cd martix/backend
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
-Open your browser at `http://127.0.0.1:5000` to access the dashboard.
 
-To launch in desktop app window mode:
-```bash
-python desktop.py
-```
+Access the web portal at <http://127.0.0.1:5000>. For a standalone desktop window without a browser tab:
+`python desktop.py`.
 
----
+### Optional Integrations
 
-## 📦 Building a 1-Click Desktop Executable
-
-Want a standalone executable binary without needing a Python setup?
-
-```bash
-cd backend
-python build_desktop.py
-```
-The compiled binary will be placed inside `backend/dist/`.
+| Feature | Requirement |
+|---|---|
+| Image OCR Content Extraction | Tesseract OCR (`sudo apt install tesseract-ocr`) |
+| Local AI Classification | [Ollama](https://ollama.com) + `MARTIX_LLM=1` |
+| Native Desktop Window | `pip install -r requirements-desktop.txt` |
 
 ---
 
-## 🖥️ Native Desktop App & Autostart Setup
+## Privacy Architecture
 
-Martix can run as a **native standalone desktop application** (in its own dedicated window without any web browser UI) and start automatically whenever you log into your PC:
+Privacy in Martix is enforced directly by codebase constraints:
 
-### Automatic Desktop & Startup Installation (Linux)
-```bash
-cd backend/deploy
-./install_autostart_desktop.sh
-```
-This registers Martix in your desktop application menu (`~/.local/share/applications/martix.desktop`) and sets it to auto-launch on startup (`~/.config/autostart/martix.desktop`).
+- **Single Outbound Network Path:** The only permitted HTTP request across the entire repository is to a local LLM instance. Every outbound call validates that the target URL resolves strictly to a loopback address (`127.0.0.1` / `localhost`). Setting `MARTIX_LLM_URL` to a remote host causes Martix to reject the request and log a warning.
+- **Local Host Binding:** Server binds strictly to `127.0.0.1`. Binding to external interfaces requires setting an explicit `MARTIX_TOKEN`.
+- **Zero Telemetry:** No analytics, tracking code, or user accounts.
+- **Isolated Frontend Assets:** Interface assets are self-contained with no external CDN or remote font dependencies, enforced by a restrictive Content-Security-Policy (CSP).
 
-### Linux Service (Headless systemd user service)
-```bash
-cd backend/deploy
-./install_linux.sh
-```
-
-### macOS (LaunchAgent)
-```bash
-cd backend/deploy
-./install_macos.sh
-```
-
-### Windows (Scheduled Task)
-```powershell
-cd backend\deploy
-powershell -ExecutionPolicy Bypass -File install_windows.ps1
-```
-
-*(To uninstall services, run the corresponding `./uninstall_...` script in `backend/deploy/`.)*
-
+Detailed threat models and security bounds are available in [docs/security.md](docs/security.md).
 
 ---
 
-## 🧪 Testing
+## Documentation
 
-Martix features a comprehensive, isolated integration test suite:
+| Document | Description |
+|---|---|
+| [Architecture](docs/architecture.md) | Internal modular architecture and execution flow |
+| [Security Model](docs/security.md) | Threat model, defense mechanisms, and bounds |
+| [Configuration](docs/configuration.md) | Environment variables, categories, and settings |
+| [REST API Reference](docs/api.md) | Endpoint reference specification |
+| [Development Guide](docs/development.md) | Local environment setup, test suites, and conventions |
+| [Architecture Decisions (ADR)](docs/decisions.md) | Architecture Decision Records (ADRs) |
+| [July 2026 Audit Report](docs/audit-2026-07.md) | Comprehensive audit report and vulnerability fixes |
+| [Project Roadmap](docs/roadmap.md) | Project status and prioritized feature backlog |
+
+---
+
+## Testing & Verification
 
 ```bash
 cd backend
-.venv/bin/python tests/test_all.py
+.venv/bin/python tests/test_all.py           # Integration test suite
+.venv/bin/python tests/test_regressions.py   # Audit regression probes (27 test cases)
+.venv/bin/python tests/test_security.py      # Live security attack probes (12 test cases)
 ```
+
+The security and regression test suites do not merely check code constants; **they actively execute attack payloads against the running application**. Test execution isolated inside temporary `HOME` and SQLite database fixtures ensures zero side effects on user data.
 
 ---
 
-## 📁 Project Structure
+## Current Status
 
-```
-backend/
-├── app/
-│   ├── classifier.py      # Classification engine (Scratch rules, OCR, EXIF/ID3 tags)
-│   ├── organizer.py       # File moves, renaming templates, zip unpacking, fast-hash dedup
-│   ├── watcher.py         # Real-time multi-folder Watchdog patrol & desktop notifications
-│   ├── scheduler.py       # Background TaskScheduler for cron cleanups & sweeps
-│   ├── llm.py             # Local Ollama LLM integration & Smart Learning
-│   ├── server.py          # REST API endpoints & rule import/export
-│   ├── browser.py         # Safe path resolution (HOME_DIR restriction)
-│   └── security.py        # Host/Origin validation, CSRF & privacy headers
-├── build_desktop.py       # PyInstaller desktop packaging script
-├── main.py                # Server entry point
-├── desktop.py             # pywebview Desktop wrapper
-└── tests/test_all.py      # Integration test suite (32 test blocks)
+Fully functional and in active daily production. The July 2026 security audit verified and resolved 16 logic bugs and 2 exploitable security vulnerabilities; comprehensive details are in [docs/audit-2026-07.md](docs/audit-2026-07.md).
 
-frontend/
-├── index.html             # Web dashboard template
-├── app.js                 # Dashboard UI logic, rule builder, duplicate tool, i18n
-└── styles.css             # Responsive styling & themes
-├── install.sh              # 1-Click installer wrapper
-├── uninstall.sh            # 1-Click uninstaller wrapper
-├── installer.py            # Unified cross-platform installer script
-├── uninstaller.py          # Unified cross-platform uninstaller script
-├── DECISIONS.md            # Architecture Decision Records (ADR)
-├── ROADMAP.md              # Project status & backlog
-```
+Martix is an open-source personal software project. Always maintain independent backups of critical data before running automated file operations, and utilize **Simulation Mode** to verify rule outcomes.
 
 ---
 
-## 📜 Architecture Decisions
+## Contributing
 
-All major design and architectural decisions (ADRs) are documented in [DECISIONS.md](DECISIONS.md).
+Contributions and issue reports are welcome! Please review [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
+
+To report security concerns, please consult [SECURITY.md](SECURITY.md).
 
 ---
 
-## 🤝 Contributing
+## License
 
-Contributions, bug reports, and feature suggestions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## 📄 License
-
-Martix is open-source software licensed under the [MIT License](LICENSE).
-Created with ❤️ by Marc Martí Torralba.
+Distributed under the [MIT License](LICENSE).
