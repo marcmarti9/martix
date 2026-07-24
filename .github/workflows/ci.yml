@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # test_security.py ejecuta el escapeHtml() real del frontend para
+      # comprobar el escapado, en vez de fiarse de una copia en el test.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Suite de integración
+        working-directory: backend
+        run: python tests/test_all.py
+
+      - name: Regresiones de la auditoría
+        working-directory: backend
+        run: python tests/test_regressions.py
+
+      - name: Seguridad (ejecuta los ataques de verdad)
+        working-directory: backend
+        run: python tests/test_security.py
+
+  arranque:
+    name: El servidor arranca y responde
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Arrancar y comprobar la API
+        working-directory: backend
+        run: |
+          python main.py &
+          SERVER_PID=$!
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:5000/api/status >/dev/null && break
+            sleep 1
+          done
+          echo "--- /api/status ---"
+          curl -sf http://127.0.0.1:5000/api/status | tee /dev/stderr | grep -q downloads_dir
+
+          echo "--- la CSP debe estar presente ---"
+          curl -sfD- -o /dev/null http://127.0.0.1:5000/ | grep -qi "content-security-policy"
+
+          echo "--- las rutas protegidas deben rechazarse ---"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -d '{"path":".ssh"}' \
+            http://127.0.0.1:5000/api/disk/delete)" = "403"
+
+          kill $SERVER_PID
