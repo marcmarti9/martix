@@ -375,11 +375,98 @@ def _unique_destination(dest_dir: Path, filename: str) -> Path:
     return dest
 
 
+def is_destination_or_reserved_dir(path: Path) -> bool:
+    """Comprueba si un directorio es una carpeta de sistema, reservada o una
+    carpeta de destino activa para evitar mover carpetas del sistema o provocar bucles."""
+    if not path.is_dir():
+        return False
+    if path.name.startswith("."):
+        return True
+    if is_temporary_download_file(path):
+        return True
+    if path.name in ("node_modules", ".venv", "__pycache__", ".git", "scratch", "dist", "build"):
+        return True
+
+    try:
+        resolved = path.resolve()
+        if resolved in (HOME_DIR.resolve(), DOWNLOADS_DIR.resolve()):
+            return True
+
+        scan_dirs = get_default_scan_dirs()
+        for d in scan_dirs:
+            if resolved == d.resolve():
+                return True
+    except (OSError, ValueError):
+        pass
+
+    return False
+
+
+def organize_folder(path: Path) -> dict | None:
+    """Mueve una carpeta completa a su destino según reglas o clasificación."""
+    if not path.exists() or not path.is_dir():
+        return None
+
+    if is_destination_or_reserved_dir(path):
+        return None
+
+    if is_file_in_use(path):
+        return None
+
+    category, relative_folder, rename_pattern = resolve_destination_folder(path)
+    dest_dir = safe_destination_dir(relative_folder)
+    if dest_dir is None:
+        logger.warning("destino invalido %r para carpeta %s; no se mueve", relative_folder, path.name)
+        return None
+
+    if dest_dir.resolve() == path.parent.resolve() or dest_dir.resolve() == path.resolve():
+        return None
+
+    topic_name = category.split(": ", 1)[1] if category.startswith("tema: ") else None
+    if rename_pattern:
+        dest_filename = format_rename_pattern(rename_pattern, path, category, topic_name)
+    else:
+        dest_filename = path.name
+
+    with _move_lock:
+        destination = _unique_destination(dest_dir, dest_filename)
+        if destination.resolve() == path.resolve():
+            return None
+
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            source_str = str(path)
+            shutil.move(source_str, str(destination))
+        except OSError as exc:
+            logger.error("no se pudo mover carpeta %s: %s", path.name, exc)
+            return None
+
+    db.log_move(
+        filename=path.name,
+        source=source_str,
+        destination=str(destination),
+        category=category,
+    )
+    return {
+        "filename": path.name,
+        "source": source_str,
+        "destination": str(destination),
+        "category": category,
+        "is_dir": True,
+    }
+
+
 def organize_file(path: Path) -> dict | None:
-    """Mueve un archivo a su carpeta correspondiente. Devuelve info del
+    """Mueve un archivo o carpeta a su ubicación correspondiente. Devuelve info del
     movimiento, o None si no se movio (ya no existe, destino invalido,
     o ya esta en su carpeta de destino)."""
-    if not path.exists() or not path.is_file():
+    if not path.exists():
+        return None
+
+    if path.is_dir():
+        return organize_folder(path)
+
+    if not path.is_file():
         return None
 
     if is_temporary_download_file(path):
@@ -406,10 +493,6 @@ def organize_file(path: Path) -> dict | None:
         else:
             folder_name = path.stem
 
-        # Nombres sin "raiz" (p.ej. un archivo llamado literalmente ".tar.gz")
-        # dejarian folder_name vacio, y extract_dir apuntaria a la propia
-        # carpeta vigilada: el contenido se desempaquetaria sin aislar ahi,
-        # pudiendo pisar archivos existentes. Se usa un nombre de reserva.
         extract_dir = path.parent / (folder_name or f"{path.name}_extraido")
         try:
             unpack_archive(path, extract_dir)
@@ -429,6 +512,12 @@ def organize_file(path: Path) -> dict | None:
             }
         except Exception as exc:
             logger.warning("no se pudo desempaquetar %s, continuando clasificacion normal: %s", path.name, exc)
+            if extract_dir.exists() and extract_dir.is_dir():
+                try:
+                    if not any(extract_dir.iterdir()):
+                        extract_dir.rmdir()
+                except OSError:
+                    pass
 
     category, relative_folder, rename_pattern = resolve_destination_folder(path)
 
@@ -437,26 +526,18 @@ def organize_file(path: Path) -> dict | None:
         logger.warning("destino invalido %r para %s; no se mueve", relative_folder, path.name)
         return None
 
-    # si el destino es la propia carpeta donde ya esta el archivo, no hay
-    # nada que hacer (y evita bucles de renombrado con la Patrulla Activa).
     if dest_dir.resolve() == path.parent.resolve():
         return None
 
-    # Determinar nombre de archivo destino
     topic_name = category.split(": ", 1)[1] if category.startswith("tema: ") else None
     if rename_pattern:
         dest_filename = format_rename_pattern(rename_pattern, path, category, topic_name)
     else:
         dest_filename = path.name
 
-    # Desde aqui, elegir el nombre de destino y mover el archivo debe ser
-    # atomico entre hilos (ver _move_lock) para no pisar archivos en una
-    # carrera entre workers del watcher/scheduler/API.
     with _move_lock:
-        # Control de duplicaciones si ya existe el nombre
         destination = dest_dir / dest_filename
         if destination.exists():
-            # Comprobar si son exactamente identicos (tamaño y hash SHA256)
             if destination.stat().st_size == path.stat().st_size and calculate_sha256(destination) == calculate_sha256(path):
                 action = db.get_setting("duplicate_action", "suffix")
                 if action == "delete_source":
@@ -470,11 +551,8 @@ def organize_file(path: Path) -> dict | None:
                     logger.info("Omitido movimiento: %s ya existe e identico en destino", path.name)
                     return None
 
-            # Si no son identicos (o la opcion es suffix), generamos un nombre unico
             destination = _unique_destination(dest_dir, dest_filename)
 
-        # Si el destino es la propia carpeta donde ya esta el archivo Y tiene el mismo nombre, no hay
-        # nada que hacer (y evita bucles de renombrado con la Patrulla Activa).
         if destination.resolve() == path.resolve():
             return None
 
@@ -501,22 +579,31 @@ def organize_file(path: Path) -> dict | None:
 
 
 def organize_directory(directory: Path) -> list[dict]:
-    """Organiza de golpe todos los archivos ya existentes en una carpeta
+    """Organiza de golpe todos los archivos y carpetas ya existentes en un directorio
     (usado por 'Organizar Ahora')."""
     moved = []
     if not directory.exists():
         return moved
     for entry in sorted(directory.iterdir()):
-        if not entry.is_file() or is_temporary_download_file(entry) or is_file_in_use(entry):
+        if entry.name.startswith("."):
             continue
-        try:
-            if entry.stat().st_size == 0:
+        if entry.is_file():
+            if is_temporary_download_file(entry) or is_file_in_use(entry):
                 continue
-        except OSError:
-            continue
-        result = organize_file(entry)
-        if result:
-            moved.append(result)
+            try:
+                if entry.stat().st_size == 0:
+                    continue
+            except OSError:
+                continue
+            result = organize_file(entry)
+            if result:
+                moved.append(result)
+        elif entry.is_dir():
+            if is_destination_or_reserved_dir(entry) or is_file_in_use(entry):
+                continue
+            result = organize_folder(entry)
+            if result:
+                moved.append(result)
     return moved
 
 

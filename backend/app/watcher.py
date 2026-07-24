@@ -55,6 +55,30 @@ def send_notification(title: str, message: str) -> None:
     threading.Thread(target=_notify, daemon=True).start()
 
 
+import os
+from app.organizer import organize_file, is_destination_or_reserved_dir
+
+def _get_dir_stats(dir_path: Path) -> tuple[int, int, bool]:
+    """Retorna (tamaño_total, recuento_archivos, tiene_descargas_temporales) para una carpeta."""
+    total_size = 0
+    file_count = 0
+    has_temp = False
+    try:
+        for root, _, files in os.walk(dir_path):
+            for f in files:
+                if is_temporary_download_file(Path(f)):
+                    has_temp = True
+                fp = Path(root) / f
+                try:
+                    total_size += fp.stat().st_size
+                    file_count += 1
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return total_size, file_count, has_temp
+
+
 class _DownloadEventHandler(FileSystemEventHandler):
     def __init__(self):
         super().__init__()
@@ -68,17 +92,16 @@ class _DownloadEventHandler(FileSystemEventHandler):
             threading.Thread(target=self._worker, daemon=True).start()
 
     def on_created(self, event):
-        if not event.is_directory:
-            self._schedule(Path(event.src_path))
+        self._schedule(Path(event.src_path))
 
     def on_moved(self, event):
-        # los navegadores suelen descargar a "archivo.crdownload" y luego
-        # renombrar a "archivo.pdf" al terminar: eso dispara on_moved.
-        if not event.is_directory and event.dest_path:
+        if event.dest_path:
             self._schedule(Path(event.dest_path))
 
     def _schedule(self, path: Path):
         if is_temporary_download_file(path):
+            return
+        if path.is_dir() and is_destination_or_reserved_dir(path):
             return
         with self._lock:
             if path in self._in_progress:
@@ -95,10 +118,10 @@ class _DownloadEventHandler(FileSystemEventHandler):
                     if result:
                         filename = result.get("filename", path.name)
                         category = result.get("category", "")
-                        msg = f"Archivo organizado: {filename} ({category})" if category else f"Archivo organizado: {filename}"
+                        item_label = "Carpeta organizada" if result.get("is_dir") else "Archivo organizado"
+                        msg = f"{item_label}: {filename} ({category})" if category else f"{item_label}: {filename}"
                         send_notification("Martix", msg)
             except Exception as e:
-                # Evita que el hilo muera de forma silenciosa e informa del fallo en stderr.
                 print(f"[Martix Watcher Error] No se pudo organizar {path.name}: {e}", file=sys.stderr)
             finally:
                 with self._lock:
@@ -108,33 +131,51 @@ class _DownloadEventHandler(FileSystemEventHandler):
     @staticmethod
     def _wait_until_stable(path: Path) -> bool:
         last_size = -1
+        last_count = -1
         stable_count = 0
         for _ in range(STABLE_WAIT_TIMEOUT_TICKS):
             if not path.exists():
                 return False
             if is_temporary_download_file(path):
                 return False
-            if is_file_in_use(path):
-                stable_count = 0
-                time.sleep(STABLE_CHECK_INTERVAL)
-                continue
-            try:
-                size = path.stat().st_size
-            except OSError:
-                # En Windows, los archivos abiertos/descargando pueden lanzar violacion de acceso (OSError).
-                # Reiniciamos la cuenta de estabilidad y esperamos al siguiente tick en lugar de abortar.
-                stable_count = 0
-                time.sleep(STABLE_CHECK_INTERVAL)
-                continue
-            if size == last_size and size > 0:
-                stable_count += 1
-                if stable_count >= STABLE_CHECKS_REQUIRED:
-                    if not is_file_in_use(path):
+
+            if path.is_dir():
+                if is_destination_or_reserved_dir(path):
+                    return False
+                size, count, has_temp = _get_dir_stats(path)
+                if has_temp:
+                    stable_count = 0
+                    time.sleep(STABLE_CHECK_INTERVAL)
+                    continue
+                if size == last_size and count == last_count and (size > 0 or count == 0):
+                    stable_count += 1
+                    if stable_count >= STABLE_CHECKS_REQUIRED:
                         return True
+                else:
+                    stable_count = 0
+                    last_size = size
+                    last_count = count
+                time.sleep(STABLE_CHECK_INTERVAL)
             else:
-                stable_count = 0
-                last_size = size
-            time.sleep(STABLE_CHECK_INTERVAL)
+                if is_file_in_use(path):
+                    stable_count = 0
+                    time.sleep(STABLE_CHECK_INTERVAL)
+                    continue
+                try:
+                    size = path.stat().st_size
+                except OSError:
+                    stable_count = 0
+                    time.sleep(STABLE_CHECK_INTERVAL)
+                    continue
+                if size == last_size and size > 0:
+                    stable_count += 1
+                    if stable_count >= STABLE_CHECKS_REQUIRED:
+                        if not is_file_in_use(path):
+                            return True
+                else:
+                    stable_count = 0
+                    last_size = size
+                time.sleep(STABLE_CHECK_INTERVAL)
         return False
 
 

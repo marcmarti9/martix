@@ -860,4 +860,18 @@ assert not dummy_del_file.exists()
 
 print("OK analizador de espacio de disco (backend & endpoints)")
 
+# Probamos organización de carpetas completas
+test_folder = downloads / "Fotos_Vacaciones_2025"
+test_folder.mkdir(parents=True, exist_ok=True)
+(test_folder / "playa.png").write_bytes(b"dummy image content")
+(test_folder / "hotel.jpg").write_bytes(b"dummy image content 2")
+
+res_folder = organize_file(test_folder)
+assert res_folder is not None
+assert res_folder.get("is_dir") is True
+assert res_folder["category"] == "pictures" or "Pictures" in res_folder["destination"]
+assert not test_folder.exists()
+assert Path(res_folder["destination"]).exists()
+print("OK organizacion de carpetas completas")
+
 print("\nTODAS LAS PRUEBAS PASARON")

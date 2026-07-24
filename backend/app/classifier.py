@@ -174,12 +174,70 @@ def _match_subcategory(category: str, stem: str) -> dict | None:
     return None
 
 
+def classify_folder(path: Path) -> dict:
+    """Clasifica un directorio entero según el nombre de la carpeta, temas,
+    subcategorías o contenido predominante dentro del mismo."""
+    stem = path.name
+
+    # 1. Comprobar Temas del usuario por nombre de carpeta
+    topics = db.list_topics()
+    if topics:
+        topic = _best_topic_for_text(stem, topics)
+        if topic:
+            return {
+                "category": f"tema: {topic['name']}",
+                "topic": topic["name"],
+                "folder": topic["destination"],
+                "rename_pattern": topic.get("rename_pattern")
+            }
+
+    # 2. Comprobar subcategorías por patrón en el nombre de la carpeta
+    for cat_name in _categories["categories"]:
+        sub = _match_subcategory(cat_name, stem)
+        if sub:
+            return {"category": sub["label"], "topic": None, "folder": sub["folder"]}
+
+    # 3. Analizar extensión predominante dentro de la carpeta
+    ext_counts: dict[str, int] = {}
+    total_files = 0
+    try:
+        import os
+        for root, _, files in os.walk(path):
+            for f in files:
+                if f.startswith("."):
+                    continue
+                ext = Path(f).suffix.lower().lstrip(".")
+                if ext:
+                    cat = _EXT_TO_CATEGORY.get(ext, "other")
+                    ext_counts[cat] = ext_counts.get(cat, 0) + 1
+                    total_files += 1
+                if total_files >= 100:
+                    break
+            if total_files >= 100:
+                break
+    except OSError:
+        pass
+
+    if total_files > 0 and ext_counts:
+        dominant_cat = max(ext_counts, key=ext_counts.get)
+        dominant_count = ext_counts[dominant_cat]
+        if dominant_count / total_files >= 0.4 and dominant_cat in _categories["categories"]:
+            category_folder = _categories["categories"][dominant_cat]["folder"]
+            return {"category": dominant_cat, "topic": None, "folder": category_folder}
+
+    fallback_folder = _categories["categories"].get("other", {}).get("folder", "Other")
+    return {"category": "other", "topic": None, "folder": fallback_folder}
+
+
 def classify(path: Path) -> dict:
     """Devuelve {"category": str, "topic": str | None, "folder": str}
     donde 'folder' es la ruta relativa a la carpeta personal del usuario.
 
     Prioridad: Temas del usuario > subcategorias descriptivas por nombre >
     LLM local opcional (documentos) > carpeta base de la categoria."""
+    if path.is_dir():
+        return classify_folder(path)
+
     ext = path.suffix.lower().lstrip(".")
     category = _EXT_TO_CATEGORY.get(ext, "other")
 

@@ -47,6 +47,18 @@ Este documento registra todas las decisiones de diseño, arquitectura y producto
 
 ---
 
+### [2026-07-24] — ADR-004: Soporte Completo para Organización de Carpetas y Subdirectorios
+* **Contexto:** Martix organizaba automáticamente archivos sueltos, pero ignoraba o dejaba sin mover carpetas o subdirectorios completos cuando los usuarios los descargaban o arrastraban a carpetas vigiladas.
+* **Decisión:**
+  1. **Clasificación de Carpetas (`backend/app/classifier.py` -> `classify_folder`):** Evalúa el nombre de la carpeta contra Temas activos y subcategorías. Si no coincide, analiza las extensiones de los archivos dentro de la carpeta para determinar la categoría predominante (imágenes, música, vídeos, documentos) o asignarla a `other`.
+  2. **Motor de Movimiento Seguro (`backend/app/organizer.py` -> `organize_folder`, `is_destination_or_reserved_dir`):**
+     - Mueve la carpeta completa como una unidad atómica usando sufijo único ante colisiones de nombre (`Carpeta (1)`).
+     - **Guardas de Seguridad:** Impide explícitamente mover carpetas del sistema, la propia carpeta raíz (`HOME_DIR`, `DOWNLOADS_DIR`), subcarpetas reservadas (`node_modules`, `.venv`, `.git`, `scratch`, `build`), carpetas ocultas (`.`) o las propias carpetas de destino de categorías/temas, previniendo bucles infinitos o corrupción de rutas.
+  3. **Patrulla Activa en Tiempo Real (`backend/app/watcher.py`):** Captura eventos de carpetas creadas/movidas y utiliza verificación de estabilidad recursiva (`_get_dir_stats`) asegurando que los archivos internos terminaron de copiado/descarga antes de mover la carpeta.
+* **Consecuencias:** Martix organiza de forma homogénea tanto archivos individuales como directorios y álbumes completos.
+
+---
+
 ### [2026-07-22] — ADR-000: Base del Sistema Martix y Clasificación Híbrida
 * **Contexto:** Diseño inicial de la plataforma de organización 100% local.
 * **Decisión:**
