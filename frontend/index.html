@@ -47,9 +47,9 @@
                     <span data-i18n="simulate_btn">Simular (Prueba)</span>
                 </button>
 
-                <button type="button" id="btn-disk-analyzer" class="btn btn-primary btn-disk-analyzer-accent" title="Analizador interactivo de tamaño de archivos y carpetas">
+                <button type="button" id="btn-disk-analyzer" class="btn btn-primary btn-disk-analyzer-accent" data-i18n-title="disk_analyzer_btn_title" title="Analizador interactivo de tamaño de archivos y carpetas">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    <span>Analizador de Espacio</span>
+                    <span data-i18n="disk_analyzer_btn">Analizador de Espacio</span>
                 </button>
 
                 <div class="toolbar-divider"></div>
@@ -224,8 +224,8 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                 </div>
                 <div>
-                    <h2>Analizador de Espacio de Disco</h2>
-                    <span class="disk-analyzer-subtitle">Visualizador interactivo de carpetas, archivos, extensiones y mapa de bloques</span>
+                    <h2 data-i18n="disk_analyzer_modal_title">Analizador de Espacio de Disco</h2>
+                    <span class="disk-analyzer-subtitle" data-i18n="disk_analyzer_modal_subtitle">Visualizador interactivo de carpetas, archivos, extensiones y mapa de bloques</span>
                 </div>
             </div>
 
@@ -234,34 +234,34 @@
                 <select id="disk-analyzer-drive-select" class="disk-analyzer-select">
                     <!-- Populated dynamically -->
                 </select>
-                <input type="text" id="disk-analyzer-path-input" placeholder="Ruta a escanear (ej. Downloads, ~)" class="disk-analyzer-input">
+                <input type="text" id="disk-analyzer-path-input" data-i18n-placeholder="disk_analyzer_input_ph" placeholder="Ruta a escanear (ej. Downloads, ~)" class="disk-analyzer-input">
                 <button type="button" id="btn-disk-analyzer-scan" class="btn btn-primary btn-disk-analyzer-accent">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <span>Escanear</span>
+                    <span data-i18n="disk_analyzer_scan_btn">Escanear</span>
                 </button>
-                <button type="button" id="btn-close-disk-analyzer" class="btn-close-modal btn-close-analyzer" title="Cerrar diálogo">&times;</button>
+                <button type="button" id="btn-close-disk-analyzer" class="btn-close-modal btn-close-analyzer" data-i18n-title="close_title" title="Cerrar diálogo">&times;</button>
             </div>
         </div>
 
         <!-- Disk Space Overview Bar -->
         <div id="disk-analyzer-summary-bar">
             <div class="disk-analyzer-stat-badge">
-                <span class="disk-analyzer-stat-label">Estado:</span>
-                <span id="disk-analyzer-scan-status" class="disk-analyzer-stat-val">Listo para escanear</span>
+                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_status_label">Estado:</span>
+                <span id="disk-analyzer-scan-status" class="disk-analyzer-stat-val" data-i18n="disk_analyzer_ready_status">Listo para escanear</span>
             </div>
             <div class="disk-analyzer-stat-badge">
-                <span class="disk-analyzer-stat-label">Espacio Total:</span>
+                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_total_label">Espacio Total:</span>
                 <span id="disk-analyzer-total-space" class="disk-analyzer-stat-val">--</span>
             </div>
             <div class="disk-analyzer-space-item">
-                <span class="disk-analyzer-stat-label">Espacio Usado:</span>
+                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_used_label">Espacio Usado:</span>
                 <span id="disk-analyzer-used-space" class="disk-analyzer-stat-val">--</span>
                 <div class="disk-analyzer-progress-bg">
                     <div id="disk-analyzer-used-bar" class="disk-analyzer-progress-fill used" style="width: 0%;"></div>
                 </div>
             </div>
             <div class="disk-analyzer-space-item">
-                <span class="disk-analyzer-stat-label">Espacio Libre:</span>
+                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_free_label">Espacio Libre:</span>
                 <span id="disk-analyzer-free-space" class="disk-analyzer-stat-val">--</span>
                 <div class="disk-analyzer-progress-bg">
                     <div id="disk-analyzer-free-bar" class="disk-analyzer-progress-fill free" style="width: 0%;"></div>
@@ -277,26 +277,26 @@
                     <div class="disk-analyzer-panel-header">
                         <div class="disk-analyzer-tab-title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                            <span>Vista de Árbol (Carpetas y Archivos)</span>
+                            <span data-i18n="disk_analyzer_tree_title">Vista de Árbol (Carpetas y Archivos)</span>
                         </div>
-                        <input type="text" id="disk-analyzer-tree-filter" placeholder="Filtrar por nombre..." class="disk-analyzer-filter-input">
+                        <input type="text" id="disk-analyzer-tree-filter" data-i18n-placeholder="disk_analyzer_filter_ph" placeholder="Filtrar por nombre..." class="disk-analyzer-filter-input">
                     </div>
                     <div class="disk-analyzer-table-wrapper">
                         <table class="disk-analyzer-table" id="disk-analyzer-tree-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 32%;">Carpeta / Archivo</th>
-                                    <th style="width: 16%;">% del Padre</th>
-                                    <th style="width: 14%;">Tamaño</th>
-                                    <th style="width: 11%;">Elementos</th>
-                                    <th style="width: 9%;">Archivos</th>
-                                    <th style="width: 9%;">Carpetas</th>
-                                    <th style="width: 9%;">Modificado</th>
+                                    <th style="width: 32%;" data-i18n="disk_analyzer_th_name">Carpeta / Archivo</th>
+                                    <th style="width: 16%;" data-i18n="disk_analyzer_th_pct">% del Padre</th>
+                                    <th style="width: 14%;" data-i18n="disk_analyzer_th_size">Tamaño</th>
+                                    <th style="width: 11%;" data-i18n="disk_analyzer_th_items">Elementos</th>
+                                    <th style="width: 9%;" data-i18n="disk_analyzer_th_files">Archivos</th>
+                                    <th style="width: 9%;" data-i18n="disk_analyzer_th_folders">Carpetas</th>
+                                    <th style="width: 9%;" data-i18n="disk_analyzer_th_modified">Modificado</th>
                                 </tr>
                             </thead>
                             <tbody id="disk-analyzer-tree-body">
                                 <tr>
-                                    <td colspan="7" class="disk-analyzer-empty-cell">Haz clic en "Escanear" para analizar la carpeta.</td>
+                                    <td colspan="7" class="disk-analyzer-empty-cell" data-i18n="disk_analyzer_tree_empty">Haz clic en "Escanear" para analizar la carpeta.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -308,22 +308,22 @@
                     <div class="disk-analyzer-panel-header">
                         <div class="disk-analyzer-tab-title">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>Desglose por Extensión</span>
+                            <span data-i18n="disk_analyzer_ext_title">Desglose por Extensión</span>
                         </div>
                     </div>
                     <div class="disk-analyzer-table-wrapper">
                         <table class="disk-analyzer-table" id="disk-analyzer-ext-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 25%;">Extensión</th>
-                                    <th style="width: 35%;">Tipo de Archivo</th>
-                                    <th style="width: 20%;">Tamaño</th>
-                                    <th style="width: 20%;">% del Total</th>
+                                    <th style="width: 25%;" data-i18n="disk_analyzer_th_extension">Extensión</th>
+                                    <th style="width: 35%;" data-i18n="disk_analyzer_th_filetype">Tipo de Archivo</th>
+                                    <th style="width: 20%;" data-i18n="disk_analyzer_th_size">Tamaño</th>
+                                    <th style="width: 20%;" data-i18n="disk_analyzer_th_pct_total">% del Total</th>
                                 </tr>
                             </thead>
                             <tbody id="disk-analyzer-ext-body">
                                 <tr>
-                                    <td colspan="4" class="disk-analyzer-empty-cell">Sin datos.</td>
+                                    <td colspan="4" class="disk-analyzer-empty-cell" data-i18n="disk_analyzer_ext_empty">Sin datos.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -336,9 +336,9 @@
                 <div class="disk-analyzer-panel-header">
                     <div class="disk-analyzer-tab-title">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                        <span>Mapa Treemap Visual (Bloques por Tamaño)</span>
+                        <span data-i18n="disk_analyzer_treemap_title">Mapa Treemap Visual (Bloques por Tamaño)</span>
                     </div>
-                    <div id="disk-analyzer-selected-hover-info" class="disk-analyzer-hover-badge">Pasa el cursor sobre un bloque o haz clic para seleccionar</div>
+                    <div id="disk-analyzer-selected-hover-info" class="disk-analyzer-hover-badge" data-i18n="disk_analyzer_hover_hint">Pasa el cursor sobre un bloque o haz clic para seleccionar</div>
                 </div>
                 <div id="disk-analyzer-treemap-canvas-container" class="disk-analyzer-treemap-canvas-container">
                     <canvas id="disk-analyzer-treemap-canvas"></canvas>
@@ -348,15 +348,15 @@
 
         <!-- Disk Analyzer Footer Bar -->
         <div id="disk-analyzer-footer">
-            <div id="disk-analyzer-footer-info" class="disk-analyzer-footer-info">
+            <div id="disk-analyzer-footer-info" class="disk-analyzer-footer-info" data-i18n="disk_analyzer_no_selection">
                 Ningún elemento seleccionado
             </div>
             <div class="disk-analyzer-footer-actions">
                 <button type="button" id="btn-disk-analyzer-delete" class="btn btn-secondary btn-danger-accent" disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    <span>Eliminar Elemento</span>
+                    <span data-i18n="disk_analyzer_delete_btn">Eliminar Elemento</span>
                 </button>
-                <button type="button" id="btn-disk-analyzer-close-footer" class="btn btn-primary">Cerrar</button>
+                <button type="button" id="btn-disk-analyzer-close-footer" class="btn btn-primary" data-i18n="disk_analyzer_close_btn">Cerrar</button>
             </div>
         </div>
     </dialog>

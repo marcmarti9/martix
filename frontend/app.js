@@ -230,7 +230,47 @@ const TRANSLATIONS = {
         slide4_desc: "Encuentra y limpia duplicados con el análisis ultra-rápido de 2 pasos. Si corriges manualmente la ubicación de un archivo en el Historial, ¡Martix aprenderá y te sugerirá una regla!",
         btn_prev: "⬅️ Anterior",
         btn_next: "Siguiente ➔",
-        btn_start: "🚀 ¡Empezar a usar Martix!"
+        btn_start: "🚀 ¡Empezar a usar Martix!",
+
+        // Disk Space Analyzer
+        disk_analyzer_btn: "Analizador de Espacio",
+        disk_analyzer_btn_title: "Analizador interactivo de tamaño de archivos y carpetas",
+        disk_analyzer_modal_title: "Analizador de Espacio de Disco",
+        disk_analyzer_modal_subtitle: "Visualizador interactivo de carpetas, archivos, extensiones y mapa de bloques",
+        disk_analyzer_input_ph: "Ruta a escanear (ej. Downloads, ~)",
+        disk_analyzer_scan_btn: "Escanear",
+        disk_analyzer_status_label: "Estado:",
+        disk_analyzer_ready_status: "Listo para escanear",
+        disk_analyzer_scanning_status: "Escaneando disco...",
+        disk_analyzer_scanning_tree: "Escaneando directorio de archivos... Por favor espera.",
+        disk_analyzer_scanning_ext: "Calculando desglose de extensiones...",
+        disk_analyzer_scan_done: "Escaneo completado en {s} s",
+        disk_analyzer_scan_error: "Error al escanear",
+        disk_analyzer_total_label: "Espacio Total:",
+        disk_analyzer_used_label: "Espacio Usado:",
+        disk_analyzer_free_label: "Espacio Libre:",
+        disk_analyzer_tree_title: "Vista de Árbol (Carpetas y Archivos)",
+        disk_analyzer_filter_ph: "Filtrar por nombre...",
+        disk_analyzer_th_name: "Carpeta / Archivo",
+        disk_analyzer_th_pct: "% del Padre",
+        disk_analyzer_th_size: "Tamaño",
+        disk_analyzer_th_items: "Elementos",
+        disk_analyzer_th_files: "Archivos",
+        disk_analyzer_th_folders: "Carpetas",
+        disk_analyzer_th_modified: "Modificado",
+        disk_analyzer_tree_empty: "Haz clic en \"Escanear\" para analizar la carpeta.",
+        disk_analyzer_ext_title: "Desglose por Extensión",
+        disk_analyzer_th_extension: "Extensión",
+        disk_analyzer_th_filetype: "Tipo de Archivo",
+        disk_analyzer_th_pct_total: "% del Total",
+        disk_analyzer_ext_empty: "Sin datos.",
+        disk_analyzer_treemap_title: "Mapa Treemap Visual (Bloques por Tamaño)",
+        disk_analyzer_hover_hint: "Pasa el cursor sobre un bloque o haz clic para seleccionar",
+        disk_analyzer_no_selection: "Ningún elemento seleccionado",
+        disk_analyzer_selected: "Seleccionado",
+        disk_analyzer_delete_btn: "Eliminar Elemento",
+        disk_analyzer_confirm_delete: "¿Estás seguro de que deseas eliminar permanentemente:\n\n{path}?",
+        disk_analyzer_close_btn: "Cerrar"
     },
     en: {
         patrol_label: "Active Patrol",
@@ -261,20 +301,61 @@ const TRANSLATIONS = {
 
         // Onboarding Welcome Modal
         step_prefix: "Step {step} of 4",
-        welcome_title: "Welcome to Sortix!",
+        welcome_title: "Welcome to Martix!",
         welcome_sub: "Your intelligent, 100% local and private file organizer.",
         slide1_title: "100% Local & Private",
         slide1_desc: "Your documents, invoices, and photos never leave your machine. No cloud, no tracking, and no internet data calls.",
         slide2_title: "Real-Time Active Patrol",
-        slide2_desc: "Sortix watches your Downloads and custom folders. Once a download finishes (.crdownload / .part), it automatically files it in its target destination.",
+        slide2_desc: "Martix watches your Downloads and custom folders. Once a download finishes (.crdownload / .part), it automatically files it in its target destination.",
         slide3_title: "Scratch Rules, OCR & Metadata",
         slide3_desc: "Define visual rules combining extension, keywords, age (days), image OCR scanning, and EXIF/ID3 metadata tags. Connect local Ollama AI whenever needed.",
         slide4_title: "Deduplication & Smart Learning",
-        slide4_desc: "Find and clean duplicates instantly with 2-step fast hashing. If you manually correct a file placement, Sortix learns and suggests a new rule!",
+        slide4_desc: "Find and clean duplicates instantly with 2-step fast hashing. If you manually correct a file placement, Martix learns and suggests a new rule!",
         btn_prev: "⬅️ Previous",
         btn_next: "Next ➔",
-        btn_start: "🚀 Start using Sortix!",
-        topics_hint: "A Topic is anything you want to group: your bank, the gym, a specific app, invoices from a supplier... Sortix looks at the filename and, if needed, its content, searching for these keywords.",
+        btn_start: "🚀 Start using Martix!",
+
+        // Disk Space Analyzer
+        disk_analyzer_btn: "Disk Space Analyzer",
+        disk_analyzer_btn_title: "Interactive file and folder size analyzer",
+        disk_analyzer_modal_title: "Disk Space Analyzer",
+        disk_analyzer_modal_subtitle: "Interactive visualizer for folders, files, extensions, and treemaps",
+        disk_analyzer_input_ph: "Path to scan (e.g. Downloads, ~)",
+        disk_analyzer_scan_btn: "Scan",
+        disk_analyzer_status_label: "Status:",
+        disk_analyzer_ready_status: "Ready to scan",
+        disk_analyzer_scanning_status: "Scanning disk...",
+        disk_analyzer_scanning_tree: "Scanning file directory... Please wait.",
+        disk_analyzer_scanning_ext: "Calculating extension breakdown...",
+        disk_analyzer_scan_done: "Scan completed in {s} s",
+        disk_analyzer_scan_error: "Scan failed",
+        disk_analyzer_total_label: "Total Space:",
+        disk_analyzer_used_label: "Used Space:",
+        disk_analyzer_free_label: "Free Space:",
+        disk_analyzer_tree_title: "Tree View (Folders & Files)",
+        disk_analyzer_filter_ph: "Filter by name...",
+        disk_analyzer_th_name: "Folder / File",
+        disk_analyzer_th_pct: "% of Parent",
+        disk_analyzer_th_size: "Size",
+        disk_analyzer_th_items: "Items",
+        disk_analyzer_th_files: "Files",
+        disk_analyzer_th_folders: "Folders",
+        disk_analyzer_th_modified: "Modified",
+        disk_analyzer_tree_empty: "Click \"Scan\" to analyze the folder.",
+        disk_analyzer_ext_title: "Extension Breakdown",
+        disk_analyzer_th_extension: "Extension",
+        disk_analyzer_th_filetype: "File Type",
+        disk_analyzer_th_pct_total: "% of Total",
+        disk_analyzer_ext_empty: "No data.",
+        disk_analyzer_treemap_title: "Visual Treemap (Blocks by Size)",
+        disk_analyzer_hover_hint: "Hover over a block or click to select",
+        disk_analyzer_no_selection: "No item selected",
+        disk_analyzer_selected: "Selected",
+        disk_analyzer_delete_btn: "Delete Item",
+        disk_analyzer_confirm_delete: "Are you sure you want to permanently delete:\n\n{path}?",
+        disk_analyzer_close_btn: "Close",
+
+        topics_hint: "A Topic is anything you want to group: your bank, the gym, a specific app, invoices from a supplier... Martix looks at the filename and, if needed, its content, searching for these keywords.",
         topic_name_label: "Topic name",
         topic_name_placeholder: "e.g. Bank, Gym, Netflix",
         topic_dest_label: "Destination folder",
@@ -291,7 +372,7 @@ const TRANSLATIONS = {
         tab_general: "General",
         general_hint: "Global system settings to manage duplicate files and integrations.",
         tab_ai: "🤖 Local AI (Ollama)",
-        ai_hint: "Connect Sortix to your local Ollama AI server to classify files using language models (LLM) without sending any data to the cloud.",
+        ai_hint: "Connect Martix to your local Ollama AI server to classify files using language models (LLM) without sending any data to the cloud.",
         ai_status_enabled: "Ollama enabled (LLM mode)",
         ai_status_disabled: "Ollama disabled (heuristic mode)",
         ai_testing: "Testing...",
@@ -2172,9 +2253,9 @@ if (diskAnalyzerDriveSelect) {
 async function runDiskAnalyzerScan() {
     const scanPath = (diskAnalyzerPathInput ? diskAnalyzerPathInput.value : "").trim();
     const statusElem = document.getElementById("disk-analyzer-scan-status");
-    if (statusElem) statusElem.textContent = "Escaneando disco...";
-    if (diskAnalyzerTreeBody) diskAnalyzerTreeBody.innerHTML = `<tr><td colspan="7" class="disk-analyzer-empty-cell">Escaneando directorio de archivos... Por favor espera.</td></tr>`;
-    if (diskAnalyzerExtBody) diskAnalyzerExtBody.innerHTML = `<tr><td colspan="4" class="disk-analyzer-empty-cell">Calculando desglose de extensiones...</td></tr>`;
+    if (statusElem) statusElem.textContent = t("disk_analyzer_scanning_status");
+    if (diskAnalyzerTreeBody) diskAnalyzerTreeBody.innerHTML = `<tr><td colspan="7" class="disk-analyzer-empty-cell">${t("disk_analyzer_scanning_tree")}</td></tr>`;
+    if (diskAnalyzerExtBody) diskAnalyzerExtBody.innerHTML = `<tr><td colspan="4" class="disk-analyzer-empty-cell">${t("disk_analyzer_scanning_ext")}</td></tr>`;
 
     try {
         const res = await fetch("/api/disk/scan", {
@@ -2185,7 +2266,7 @@ async function runDiskAnalyzerScan() {
 
         if (!res.ok) {
             const err = await res.json();
-            if (statusElem) statusElem.textContent = `Error: ${err.error || "Fallo al escanear"}`;
+            if (statusElem) statusElem.textContent = `Error: ${err.error || t("disk_analyzer_scan_error")}`;
             return;
         }
 
@@ -2196,7 +2277,7 @@ async function runDiskAnalyzerScan() {
         renderDiskAnalyzerTreemap();
     } catch (e) {
         console.error("Error al ejecutar escaneo de espacio:", e);
-        if (statusElem) statusElem.textContent = "Error al escanear";
+        if (statusElem) statusElem.textContent = t("disk_analyzer_scan_error");
     }
 }
 
@@ -2208,7 +2289,7 @@ function renderDiskAnalyzerSummary() {
         // en vez de presentar totales incompletos como si fueran definitivos.
         statusElem.textContent = diskAnalyzerData.truncated
             ? `⚠️ ${t("disk_scan_truncated")} (${diskAnalyzerData.scan_time_seconds} s)`
-            : `Escaneo completado en ${diskAnalyzerData.scan_time_seconds} s`;
+            : t("disk_analyzer_scan_done").replace("{s}", diskAnalyzerData.scan_time_seconds);
         statusElem.classList.toggle("warning", Boolean(diskAnalyzerData.truncated));
     }
     
@@ -2456,7 +2537,7 @@ if (diskAnalyzerCanvas) {
 function selectDiskAnalyzerItem(item) {
     diskAnalyzerSelectedItem = item;
     if (diskAnalyzerFooterInfo) {
-        diskAnalyzerFooterInfo.innerHTML = `<strong>Seleccionado:</strong> ${escapeHtml(item.name)} (${item.size_formatted || formatBytes(item.size)}) — <code>${escapeHtml(item.path)}</code>`;
+        diskAnalyzerFooterInfo.innerHTML = `<strong>${escapeHtml(t("disk_analyzer_selected"))}:</strong> ${escapeHtml(item.name)} (${item.size_formatted || formatBytes(item.size)}) — <code>${escapeHtml(item.path)}</code>`;
     }
     if (btnDiskAnalyzerDelete) {
         btnDiskAnalyzerDelete.disabled = false;
@@ -2467,7 +2548,7 @@ if (btnDiskAnalyzerDelete) {
     btnDiskAnalyzerDelete.addEventListener("click", async () => {
         if (!diskAnalyzerSelectedItem) return;
         const targetPath = diskAnalyzerSelectedItem.path;
-        if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente:\n\n${targetPath}?`)) {
+        if (!confirm(t("disk_analyzer_confirm_delete").replace("{path}", targetPath))) {
             return;
         }
 
@@ -2496,7 +2577,7 @@ if (btnDiskAnalyzerDelete) {
                 showStatusMessage(`${t("status_moved_to_trash")}: ${deletedName}`);
                 diskAnalyzerSelectedItem = null;
                 btnDiskAnalyzerDelete.disabled = true;
-                if (diskAnalyzerFooterInfo) diskAnalyzerFooterInfo.textContent = "Ningún elemento seleccionado";
+                if (diskAnalyzerFooterInfo) diskAnalyzerFooterInfo.textContent = t("disk_analyzer_no_selection");
                 runDiskAnalyzerScan();
             } else {
                 const err = await res.json().catch(() => ({}));
