@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Martix como app de escritorio nativa con bandeja del sistema (System Tray).
+"""Punto de entrada de la aplicación de escritorio de Martix.
 
-- Si el servidor de Martix ya está corriendo (p.ej. como servicio), se conecta a él.
-- Si no, lo arranca dentro de este mismo proceso.
-- Utiliza PyQt6 con WebEngine y QSystemTrayIcon: al pulsar 'X' la ventana se oculta a la bandeja del sistema.
-- Clic derecho en el icono de la bandeja: 'Abrir Martix' o 'Salir de verdad'.
+El ejecutable distribuye el servidor y la interfaz en el mismo proceso. El
+servidor solo escucha en loopback, en un puerto efímero, como canal IPC interno
+para la ventana Qt; el usuario nunca necesita abrir un navegador ni conocer la
+URL.
 """
 
+from __future__ import annotations
+
 import logging
-import shutil
 import socket
-import subprocess
 import sys
 import threading
 import time
@@ -21,60 +21,84 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app import db
 from app.security import API_TOKEN, listening_beyond_localhost
 from app.server import create_app, resume_patrol_if_needed
-from config.settings import HOST, PORT
+from config.settings import HOST
 
-URL = f"http://127.0.0.1:{PORT}"
-
-WINDOW_TITLE = "Martix — Intelligent File Organizer"
-WINDOW_SIZE = (1120, 740)
+WINDOW_TITLE = "Martix — Organizador de archivos"
+WINDOW_SIZE = (1240, 800)
 
 
-def _port_open() -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.3)
-        return s.connect_ex(("127.0.0.1", PORT)) == 0
+def _port_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.3)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
-def _start_server_in_background() -> None:
+def _start_server_in_background():
+    """Start a private WSGI server on an ephemeral loopback port."""
     if listening_beyond_localhost() and not API_TOKEN:
-        print(
-            f"ERROR: HOST={HOST} expone Martix fuera de este equipo, y Martix\n"
-            "maneja documentos personales. Define un token en backend/.env\n"
-            "(MARTIX_TOKEN=una_clave_larga_y_aleatoria) o vuelve a HOST=127.0.0.1.",
-            file=sys.stderr,
+        raise RuntimeError(
+            f"HOST={HOST} expone Martix fuera de este equipo. "
+            "Usa HOST=127.0.0.1 para el ejecutable de escritorio o define "
+            "MARTIX_TOKEN en una instalación avanzada."
         )
-        sys.exit(1)
+
+    from werkzeug.serving import make_server
 
     db.init_db()
-    app = create_app()
+    application = create_app()
     resume_patrol_if_needed()
+    server = make_server("127.0.0.1", 0, application, threaded=True)
+    port = int(server.server_port)
     thread = threading.Thread(
-        target=lambda: app.run(host=HOST, port=PORT, debug=False, threaded=True),
+        target=server.serve_forever,
         daemon=True,
+        name="MartixLocalServer",
     )
     thread.start()
+
     for _ in range(50):
-        if _port_open():
-            return
+        if _port_open(port):
+            return server, thread, f"http://127.0.0.1:{port}/"
         time.sleep(0.1)
-    print("ERROR: El servidor de Martix no arrancó.", file=sys.stderr)
-    sys.exit(1)
+
+    server.shutdown()
+    raise RuntimeError("El servidor privado de Martix no arrancó.")
 
 
-def _open_pyqt6_app() -> bool:
-    """Abre Martix en una ventana Qt6 nativa con icono en la bandeja del sistema (System Tray)."""
+def _make_tray_icon(QIcon, QPixmap, QPainter, QColor, Qt):
+    """Create a small neutral icon without requiring an external asset."""
+    pixmap = QPixmap(32, 32)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setBrush(QColor("#2f2f31"))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawRoundedRect(2, 2, 28, 28, 7, 7)
+    painter.setPen(QColor("#ffffff"))
+    font = painter.font()
+    font.setBold(True)
+    font.setPixelSize(18)
+    painter.setFont(font)
+    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "M")
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _open_pyqt6_app(url: str, server) -> bool:
+    """Open the only supported end-user window: a native Qt WebEngine shell."""
     try:
         from PyQt6.QtCore import QUrl, Qt
-        from PyQt6.QtGui import QAction, QIcon, QPixmap, QPainter, QColor
+        from PyQt6.QtGui import QAction, QIcon, QPainter, QPixmap, QColor
         from PyQt6.QtWidgets import QApplication, QMainWindow, QMenu, QSystemTrayIcon
+        from PyQt6.QtWebEngineCore import QWebEngineSettings
         from PyQt6.QtWebEngineWidgets import QWebEngineView
     except ImportError:
         return False
 
-    app = QApplication.instance()
-    if not app:
-        app = QApplication(sys.argv)
-    app.setQuitOnLastWindowClosed(False)
+    application = QApplication.instance() or QApplication(sys.argv)
+    application.setApplicationName("Martix")
+    application.setOrganizationName("Martix")
+    application.setQuitOnLastWindowClosed(False)
 
     class MartixWindow(QMainWindow):
         def __init__(self):
@@ -82,112 +106,85 @@ def _open_pyqt6_app() -> bool:
             self.setWindowTitle(WINDOW_TITLE)
             self.resize(*WINDOW_SIZE)
             self.view = QWebEngineView(self)
-            self.view.setUrl(QUrl(URL))
+            settings = self.view.settings()
+            settings.setAttribute(
+                QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls,
+                False,
+            )
+            settings.setAttribute(
+                QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls,
+                False,
+            )
+            self.view.setUrl(QUrl(url))
             self.setCentralWidget(self.view)
 
         def closeEvent(self, event):
-            # En lugar de cerrar el proceso, ocultar a la bandeja del sistema
+            # Closing the window hides the background patrol. The tray menu is
+            # the explicit path for terminating the process.
             event.ignore()
             self.hide()
 
     window = MartixWindow()
-
-    # Dibujar icono elegante para la bandeja (Círculo índigo con M blanca)
-    pixmap = QPixmap(32, 32)
-    pixmap.fill(QColor(0, 0, 0, 0))
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setBrush(QColor(99, 102, 241)) # Indigo #6366f1
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawRoundedRect(2, 2, 28, 28, 8, 8)
-    
-    # Dibujar la 'M'
-    painter.setPen(QColor(255, 255, 255))
-    font = painter.font()
-    font.setBold(True)
-    font.setPixelSize(18)
-    painter.setFont(font)
-    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, "M")
-    painter.end()
-    
-    icon = QIcon(pixmap)
+    icon = _make_tray_icon(QIcon, QPixmap, QPainter, QColor, Qt)
     window.setWindowIcon(icon)
 
-    tray = QSystemTrayIcon(icon, app)
-    tray.setToolTip("Martix — Organizador en segundo plano")
-
+    tray = QSystemTrayIcon(icon, application)
+    tray.setToolTip("Martix — organización local y privada")
     menu = QMenu()
-    open_action = QAction("📂 Abrir Martix", menu)
+
+    open_action = QAction("Abrir Martix", menu)
     open_action.triggered.connect(lambda: (window.show(), window.raise_(), window.activateWindow()))
-
-    quit_action = QAction("❌ Salir de verdad", menu)
-    quit_action.triggered.connect(lambda: (tray.hide(), app.quit()))
-
     menu.addAction(open_action)
     menu.addSeparator()
-    menu.addAction(quit_action)
 
+    def quit_application():
+        tray.hide()
+        try:
+            server.shutdown()
+        finally:
+            application.quit()
+
+    quit_action = QAction("Salir de Martix", menu)
+    quit_action.triggered.connect(quit_application)
+    menu.addAction(quit_action)
     tray.setContextMenu(menu)
-    tray.activated.connect(lambda reason: (window.show(), window.raise_(), window.activateWindow()) if reason == QSystemTrayIcon.ActivationReason.Trigger else None)
+    tray.activated.connect(
+        lambda reason: (
+            window.show(), window.raise_(), window.activateWindow()
+        ) if reason == QSystemTrayIcon.ActivationReason.Trigger else None
+    )
     tray.show()
 
     window.show()
-    app.exec()
+    application.exec()
     return True
 
 
-def _open_pywebview() -> bool:
+def main() -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    server = None
     try:
-        import webview
-    except ImportError:
-        return False
-    webview.create_window(WINDOW_TITLE, URL, width=WINDOW_SIZE[0], height=WINDOW_SIZE[1])
-    webview.start()
-    return True
-
-
-def _open_browser_app_window() -> bool:
-    candidates = [
-        "chromium", "chromium-browser", "google-chrome", "google-chrome-stable",
-        "brave-browser", "microsoft-edge", "msedge", "vivaldi",
-    ]
-    for name in candidates:
-        binary = shutil.which(name)
-        if binary:
-            proc = subprocess.Popen(
-                [binary, f"--app={URL}", f"--window-size={WINDOW_SIZE[0]},{WINDOW_SIZE[1]}"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-            proc.wait()
-            return True
-    return False
-
-
-def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-
-    started_here = False
-    if not _port_open():
-        _start_server_in_background()
-        started_here = True
-
-    if _open_pyqt6_app():
-        return
-    if _open_pywebview():
-        return
-    if _open_browser_app_window():
-        return
-
-    import webbrowser
-    webbrowser.open(URL)
-    if started_here:
-        print(f"Martix corriendo en {URL} (Ctrl+C para salir).")
+        server, _thread, url = _start_server_in_background()
+        if _open_pyqt6_app(url, server):
+            return 0
+        raise RuntimeError(
+            "La versión distribuida de Martix necesita PyQt6-WebEngine. "
+            "No se abrirá un navegador externo; reinstala el ejecutable oficial."
+        )
+    except Exception as exc:
+        logging.getLogger("martix.desktop").exception("No se pudo iniciar Martix")
         try:
-            while True:
-                time.sleep(3600)
-        except KeyboardInterrupt:
+            if server is not None:
+                server.shutdown()
+        except Exception:
             pass
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

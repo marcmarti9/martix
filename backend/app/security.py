@@ -17,7 +17,7 @@ import re
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import urlsplit
 
-from config.settings import API_TOKEN, HOME_DIR, HOST, PORT
+from config.settings import API_TOKEN, FROZEN, HOME_DIR, HOST, PORT
 
 # Nombres de host desde los que es legitimo hablar con Martix cuando
 # escucha solo en local.
@@ -289,6 +289,14 @@ def check_request(request) -> tuple[dict, int] | None:
     #    Origin, este debe ser tambien local/confiable.
     if request.method not in ("GET", "HEAD", "OPTIONS"):
         origin = request.headers.get("Origin", "")
+        # El ejecutable de escritorio solo habla con su propia ventana
+        # WebEngine. Los navegadores modernos envian Origin en los POST/PUT/
+        # DELETE de esa ventana; rechazar la ausencia en el build congelado
+        # evita que un proceso local cualquiera pueda disparar movimientos o
+        # borrados con una peticion HTTP "a pelo". El modo fuente mantiene la
+        # compatibilidad con clientes CLI y con las pruebas de desarrollo.
+        if FROZEN and not origin:
+            return {"error": "peticion rechazada: falta cabecera Origin"}, 403
         if origin and origin != "null":
             if not _is_trusted_hostname(_hostname_of(origin)):
                 return {"error": "peticion rechazada: origen no permitido"}, 403

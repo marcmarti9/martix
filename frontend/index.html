@@ -3,563 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Martix — File Explorer Organizer</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none';">
+    <title>Martix — Explorador de archivos</title>
     <link rel="stylesheet" href="styles.css">
-
 </head>
 <body>
     <div id="app">
-        <!-- Main Top Bar Toolbar -->
-        <header id="toolbar">
-            <div id="toolbar-brand">
-                <div class="brand-logo">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                        <polyline points="2 17 12 22 22 17"></polyline>
-                        <polyline points="2 12 12 17 22 12"></polyline>
+        <header id="toolbar" class="app-header">
+            <div id="toolbar-brand" class="brand-lockup">
+                <div class="brand-logo" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>
                     </svg>
                 </div>
-                <span class="brand-name">Martix</span>
+                <div>
+                    <span class="brand-name">Martix</span>
+                    <span class="brand-caption">organizador local</span>
+                </div>
             </div>
 
-            <div id="breadcrumbs"></div>
+            <div class="header-center">
+                <div id="breadcrumbs" class="breadcrumbs" aria-label="Ruta actual"></div>
+            </div>
 
-            <div id="toolbar-actions">
-                <!-- Auto-Organize Toggle -->
-                <div class="patrol-group" title="Organización automática en tiempo real">
-                    <span class="toolbar-label" data-i18n="patrol_label">Auto-Organizar</span>
-                    <label class="switch" data-i18n-title="patrol_title">
-                        <input type="checkbox" id="patrol-toggle">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="toolbar-divider"></div>
-
-                <!-- Primary Action Buttons with Inline SVG Icons -->
-                <button type="button" id="btn-organize" class="btn btn-primary" data-i18n-title="organize_title" title="Organizar descargas inmediatamente">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <div id="toolbar-actions" class="header-actions">
+                <label class="auto-organize-control" data-i18n-title="patrol_title" title="Organización automática de Descargas en tiempo real">
+                    <span class="toolbar-label" data-i18n="patrol_label">Auto-organizar</span>
+                    <input type="checkbox" id="patrol-toggle">
+                    <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+                </label>
+                <span class="toolbar-separator" aria-hidden="true"></span>
+                <button type="button" id="btn-organize" class="btn btn-primary" data-i18n-title="organize_title" title="Organizar descargas y carpetas vigiladas inmediatamente">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 19h14"/></svg>
                     <span data-i18n="organize_btn">Organizar ahora</span>
                 </button>
-
-                <button type="button" id="btn-simulate" class="btn btn-secondary" data-i18n-title="simulate_title" title="Previsualizar qué archivos se moverían sin tocar nada">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    <span data-i18n="simulate_btn">Simular (Prueba)</span>
+                <button type="button" id="btn-simulate" class="btn btn-quiet" data-i18n-title="simulate_title" title="Previsualizar cambios sin mover archivos">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span data-i18n="simulate_btn">Vista previa</span>
                 </button>
-
-                <button type="button" id="btn-disk-analyzer" class="btn btn-primary btn-disk-analyzer-accent" data-i18n-title="disk_analyzer_btn_title" title="Analizador interactivo de tamaño de archivos y carpetas">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                    <span data-i18n="disk_analyzer_btn">Analizador de Espacio</span>
+                <button type="button" id="btn-disk-analyzer" class="btn btn-quiet" data-i18n-title="disk_analyzer_btn_title" title="Analizador de espacio">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V5m0 14h16M8 16v-5m4 5V7m4 9v-8"/></svg>
+                    <span data-i18n="disk_analyzer_btn">Espacio</span>
                 </button>
-
-                <button type="button" id="btn-update-check" class="btn btn-update-badge hidden" data-i18n-title="update_available_title" title="Actualización disponible para Martix">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <span data-i18n="update_available_btn">🚀 Actualización disponible</span>
+                <button type="button" id="btn-update-check" class="btn btn-update-badge hidden" data-i18n-title="update_available_title" title="Actualización disponible">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+                    <span data-i18n="update_available_btn">Actualizar</span>
                 </button>
-
-                <div class="toolbar-divider"></div>
-
-                <!-- Multi-Language Selector Dropdown -->
-                <div class="lang-select-wrapper" title="Seleccionar idioma / Select language">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                    <select id="lang-select" class="lang-select">
-                        <option value="es">ES (Español)</option>
-                        <option value="en">EN (English)</option>
-                        <option value="zh">ZH (中文)</option>
-                        <option value="hi">HI (हिन्दी)</option>
-                        <option value="fr">FR (Français)</option>
-                        <option value="de">DE (Deutsch)</option>
-                    </select>
-                </div>
-
-                <!-- Theme Toggle Button (rdsx style) -->
-                <button type="button" id="btn-theme" class="btn btn-icon-text" data-i18n-title="theme_title" title="Cambiar tema claro/oscuro">
-                    <span id="theme-btn-svg-container">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-                    </span>
-                    <span id="theme-btn-label">Claro</span>
+                <span class="toolbar-separator" aria-hidden="true"></span>
+                <select id="lang-select" class="lang-select" aria-label="Idioma">
+                    <option value="es">ES</option>
+                    <option value="en">EN</option>
+                    <option value="fr">FR</option>
+                    <option value="de">DE</option>
+                    <option value="zh">ZH</option>
+                    <option value="hi">HI</option>
+                </select>
+                <button type="button" id="btn-theme" class="icon-button" data-i18n-title="theme_title" title="Cambiar tema">
+                    <span id="theme-btn-svg-container" aria-hidden="true"></span>
+                    <span id="theme-btn-label" class="sr-only">Claro</span>
                 </button>
-
-                <!-- Onboarding Help Button -->
-                <button type="button" id="btn-help" class="btn btn-icon-text" data-i18n-title="help_title" title="Ver tutorial y guía de uso">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    <span data-i18n="help_btn">Ayuda</span>
+                <button type="button" id="btn-help" class="icon-button" data-i18n-title="help_title" title="Ayuda">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.6 2.6 0 1 1 4.4 1.9c-.9.7-1.9 1.2-1.9 2.5M12 17h.01"/></svg>
+                    <span class="sr-only" data-i18n="help_btn">Ayuda</span>
                 </button>
-
-                <!-- Settings Modal Button -->
-                <button type="button" id="btn-settings" class="btn btn-icon-text btn-highlight" data-i18n-title="settings_title" title="Configurar reglas, temas, IA local y mantenimiento">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
-                    <span data-i18n="settings_btn">Ajustes y Reglas</span>
+                <button type="button" id="btn-settings" class="btn btn-settings" data-i18n-title="settings_title" title="Ajustes y reglas">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19 13 1.4 1.1-1.7 2.9-1.7-.7a7.5 7.5 0 0 1-1.4.8l-.3 1.8h-3.4l-.3-1.8a7.5 7.5 0 0 1-1.4-.8l-1.7.7-1.7-2.9L8 13a7 7 0 0 1 0-1.9l-1.4-1.2 1.7-2.8 1.7.7a7.5 7.5 0 0 1 1.4-.8l.3-1.8h3.4l.3 1.8a7.5 7.5 0 0 1 1.4.8l1.7-.7 1.7 2.8-1.4 1.2A7 7 0 0 1 19 13Z"/></svg>
+                    <span data-i18n="settings_btn">Ajustes</span>
                 </button>
             </div>
         </header>
 
-        <!-- Main Body Area -->
-        <div id="body">
-            <!-- Sidebar Navigation Tree -->
-            <nav id="sidebar">
-                <div class="sidebar-header">
-                    <span class="sidebar-title" data-i18n="sidebar_folders_title">EXPLORADOR DE CARPETAS</span>
+        <div id="body" class="explorer-shell">
+            <aside id="sidebar" class="sidebar">
+                <div class="sidebar-heading">
+                    <span class="eyebrow" data-i18n="sidebar_folders_title">LUGARES</span>
+                    <span class="sidebar-subtitle" data-i18n="sidebar_subtitle">Accesos rápidos</span>
                 </div>
-
-                <ul id="folder-tree"></ul>
-
-                <div id="sidebar-footer">
-                    <div class="stats-card">
-                        <div class="stats-icon-badge">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-                        </div>
-                        <div class="stats-info">
-                            <span class="stats-title" data-i18n="organized_count_prefix">Archivos organizados</span>
-                            <span id="files-organized-count" class="stats-count">0</span>
-                        </div>
+                <ul id="folder-tree" class="folder-tree" aria-label="Carpetas"></ul>
+                <div class="sidebar-spacer"></div>
+                <div class="privacy-card">
+                    <div class="privacy-card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 19 6v5c0 4.5-2.8 8.1-7 10-4.2-1.9-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+                    </div>
+                    <div>
+                        <strong>Solo en este equipo</strong>
+                        <span>Sin nube ni telemetría</span>
                     </div>
                 </div>
-            </nav>
+                <div class="sidebar-metric">
+                    <span data-i18n="organized_count_prefix">Archivos organizados</span>
+                    <strong id="files-organized-count">0</strong>
+                </div>
+            </aside>
 
-            <!-- Main File Content Grid -->
-            <main id="content">
-                <div id="file-grid"></div>
-                <div id="empty-state" class="empty-state-card" hidden>
+            <main id="content" class="content-pane">
+                <div class="content-toolbar">
+                    <div class="content-heading-copy">
+                        <span class="eyebrow" data-i18n="content_eyebrow">UBICACIÓN</span>
+                        <h1 id="content-title">Inicio</h1>
+                        <p id="content-description" class="content-description" data-i18n="content_description">Tus carpetas importantes, en un solo lugar.</p>
+                    </div>
+                    <div class="content-toolbar-meta">
+                        <span id="patrol-status-pill" class="status-pill"><span id="patrol-status-text">Pausa / Desactivado</span></span>
+                    </div>
+                </div>
+
+                <section id="cleanup-panel" class="cleanup-panel" hidden aria-live="polite">
+                    <div class="cleanup-heading">
+                        <div>
+                            <span class="eyebrow">REVISIÓN</span>
+                            <h2>Posibles residuos</h2>
+                        </div>
+                        <span id="cleanup-count" class="count-badge">0</span>
+                    </div>
+                    <p>Martix ha encontrado archivos que parecen instaladores. No se eliminarán solos: revísalos cuando ya no los necesites.</p>
+                    <div id="cleanup-suggestions-list" class="cleanup-list"></div>
+                </section>
+
+                <div id="file-grid" class="file-grid"></div>
+                <div id="empty-state" class="empty-state" hidden>
                     <div class="empty-icon-badge">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H10l2 2h5.5A2.5 2.5 0 0 1 20 8.5v9A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-11Z"/></svg>
                     </div>
-                    <h3 data-i18n="empty_state_title">Carpeta sin archivos</h3>
+                    <h2 data-i18n="empty_state_title">Carpeta sin archivos</h2>
                     <p data-i18n="empty_state">Esta carpeta está vacía (o aún no se ha creado).</p>
                 </div>
             </main>
         </div>
 
-        <!-- Global Floating Status Notification Toast -->
-        <div id="status-message-wrapper">
-            <p id="status-message" role="status"></p>
+        <div id="status-message-wrapper" class="status-toast" role="status" aria-live="polite">
+            <p id="status-message"></p>
         </div>
     </div>
 
-    <!-- WELCOME ONBOARDING MODAL -->
-    <dialog id="welcome-modal" class="modal-dialog onboarding-dialog">
-        <div class="onboarding-wrapper">
-            <div class="onboarding-header">
-                <div class="onboarding-top-bar">
-                    <div class="onboarding-badge">Martix</div>
-                    <span id="onboard-step-badge" class="step-badge">Paso 1 de 4</span>
-                </div>
-                <button type="button" class="btn-close-modal" id="btn-close-welcome" title="Cerrar">&times;</button>
-            </div>
-
-            <!-- Slide Content Panels (Only 1 visible at a time) -->
-            <div class="onboarding-body">
-                <!-- Slide 1 -->
-                <div class="onboard-slide active" data-slide="1">
-                    <div class="slide-illustration">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    </div>
-                    <h2 data-i18n="slide1_title">100% Local y Totalmente Privado</h2>
-                    <p data-i18n="slide1_desc">Tus documentos, facturas, contratos y fotos jamás salen de tu ordenador. Martix funciona sin nube, sin telemetría y sin enviar un solo dato a internet. Tu privacidad está garantizada desde el primer día.</p>
-                </div>
-
-                <!-- Slide 2 -->
-                <div class="onboard-slide" data-slide="2" style="display: none;">
-                    <div class="slide-illustration">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                    </div>
-                    <h2 data-i18n="slide2_title">Auto-Organización en Tiempo Real</h2>
-                    <p data-i18n="slide2_desc">Martix monitoriza tu carpeta de Descargas. En cuanto termina una descarga (.crdownload / .part), analiza el archivo y lo traslada automáticamente a su destino (Imágenes, Vídeos, Documentos, Música...). ¡Tu carpeta de descargas estará siempre limpia!</p>
-                </div>
-
-                <!-- Slide 3 -->
-                <div class="onboard-slide" data-slide="3" style="display: none;">
-                    <div class="slide-illustration">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    </div>
-                    <h2 data-i18n="slide3_title">Reglas Scratch, OCR e IA Local (Ollama)</h2>
-                    <p data-i18n="slide3_desc">Define reglas visuales por extensión, nombre, tamaño o antigüedad (días). Martix realiza escaneo OCR en imágenes y lee metadatos EXIF (fotos) e ID3 (música). ¡Integra IA local con Ollama para clasificar sin internet!</p>
-                </div>
-
-                <!-- Slide 4 -->
-                <div class="onboard-slide" data-slide="4" style="display: none;">
-                    <div class="slide-illustration">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>
-                    </div>
-                    <h2 data-i18n="slide4_title">Deduplicación y Smart Learning</h2>
-                    <p data-i18n="slide4_desc">Encuentra y limpia duplicados con el análisis ultra-rápido de 2 pasos. Si corriges manualmente la ubicación de un archivo en el Historial, Martix aprenderá y te sugerirá crear una nueva regla automáticamente.</p>
-                </div>
-            </div>
-
-            <!-- Footer Controls & Navigation -->
-            <div class="onboarding-footer">
-                <button type="button" id="btn-onboard-prev" class="btn btn-secondary" disabled data-i18n="btn_prev">⬅️ Anterior</button>
-
-                <div class="slide-dots">
-                    <span class="dot active" data-step="1"></span>
-                    <span class="dot" data-step="2"></span>
-                    <span class="dot" data-step="3"></span>
-                    <span class="dot" data-step="4"></span>
-                </div>
-
-                <div class="slide-actions">
-                    <button type="button" id="btn-onboard-next" class="btn btn-primary" autofocus data-i18n="btn_next">Siguiente ➔</button>
-                    <button type="button" id="btn-onboard-finish" class="btn btn-primary" style="display: none;" data-i18n="btn_start">🚀 ¡Empezar a usar Martix!</button>
-                </div>
-            </div>
+    <dialog id="simulate-modal" class="modal-dialog modal-wide">
+        <div class="modal-header">
+            <div><span class="eyebrow">VISTA PREVIA</span><h2 data-i18n="simulate_modal_title">Resultado de la simulación</h2></div>
+            <button type="button" id="btn-close-simulate" class="icon-button" data-i18n-title="close_title" title="Cerrar">×</button>
         </div>
-    </dialog>
-
-    <!-- STYLED SIMULATION RESULTS MODAL -->
-    <dialog id="simulate-modal" class="modal-dialog">
-        <div class="simulate-header">
-            <div class="simulate-title-group">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <h2 data-i18n="simulate_modal_title">Resultados de la Simulación</h2>
+        <div id="simulate-results-body" class="simulation-results"></div>
+        <div class="modal-footer">
+            <div id="simulate-pagination" class="simulation-pagination" hidden>
+                <button type="button" id="btn-simulate-prev" class="btn btn-quiet">Anterior</button>
+                <span id="simulate-page-label" class="muted"></span>
+                <button type="button" id="btn-simulate-next" class="btn btn-quiet">Siguiente</button>
             </div>
-            <button type="button" id="btn-close-simulate" class="btn-close-modal" title="Cerrar">&times;</button>
-        </div>
-        <p class="hint" data-i18n="simulate_modal_hint">Esta es una vista previa. Ningún archivo real ha sido modificado.</p>
-        <div id="simulate-results-body" class="simulate-body"></div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; padding-top: 14px; border-top: 1px solid var(--border-color);">
             <button type="button" id="btn-close-simulate-footer" class="btn btn-primary" data-i18n="simulate_close_btn">Cerrar</button>
         </div>
     </dialog>
 
-    <!-- DISK ANALYZER MODAL -->
-    <dialog id="disk-analyzer-modal" class="modal-dialog disk-analyzer-fullscreen-dialog">
-        <div id="disk-analyzer-header">
-            <div class="disk-analyzer-title-group">
-                <div class="disk-analyzer-logo-badge">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                </div>
-                <div>
-                    <h2 data-i18n="disk_analyzer_modal_title">Analizador de Espacio de Disco</h2>
-                    <span class="disk-analyzer-subtitle" data-i18n="disk_analyzer_modal_subtitle">Visualizador interactivo de carpetas, archivos, extensiones y mapa de bloques</span>
-                </div>
+    <dialog id="welcome-modal" class="modal-dialog onboarding-dialog">
+        <div class="modal-header">
+            <div><span class="eyebrow">MARTIX</span><h2 data-i18n="welcome_title">¡Bienvenido a Martix!</h2></div>
+            <button type="button" id="btn-close-welcome" class="icon-button" data-i18n-title="close_title" title="Cerrar">×</button>
+        </div>
+        <div class="onboarding-body">
+            <div class="onboard-slide active" data-slide="1">
+                <div class="slide-illustration"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 19 6v5c0 4.5-2.8 8.1-7 10-4.2-1.9-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+                <h3 data-i18n="slide1_title">100% Local y Privado</h3><p data-i18n="slide1_desc">Tus archivos permanecen en tu equipo. Martix no usa nube ni telemetría.</p>
             </div>
-
-            <!-- Controls: Target path dropdown, input, scan button & close button -->
-            <div class="disk-analyzer-controls">
-                <select id="disk-analyzer-drive-select" class="disk-analyzer-select">
-                    <!-- Populated dynamically -->
-                </select>
-                <input type="text" id="disk-analyzer-path-input" data-i18n-placeholder="disk_analyzer_input_ph" placeholder="Ruta a escanear (ej. Downloads, ~)" class="disk-analyzer-input">
-                <button type="button" id="btn-disk-analyzer-scan" class="btn btn-primary btn-disk-analyzer-accent">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <span data-i18n="disk_analyzer_scan_btn">Escanear</span>
-                </button>
-                <button type="button" id="btn-close-disk-analyzer" class="btn-close-modal btn-close-analyzer" data-i18n-title="close_title" title="Cerrar diálogo">&times;</button>
+            <div class="onboard-slide" data-slide="2" hidden>
+                <div class="slide-illustration"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 19h14"/></svg></div>
+                <h3 data-i18n="slide2_title">Organización en tiempo real</h3><p data-i18n="slide2_desc">Vigila Descargas y espera a que cada archivo termine antes de clasificarlo.</p>
+            </div>
+            <div class="onboard-slide" data-slide="3" hidden>
+                <div class="slide-illustration"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h4M9 13h6M9 17h4"/></svg></div>
+                <h3 data-i18n="slide3_title">Reglas claras y clasificación local</h3><p data-i18n="slide3_desc">Combina reglas, contenido, OCR y una IA local opcional sin enviar documentos fuera.</p>
+            </div>
+            <div class="onboard-slide" data-slide="4" hidden>
+                <div class="slide-illustration"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5"/><path d="M12 8v4l3 2"/></svg></div>
+                <h3 data-i18n="slide4_title">Tú decides sobre la limpieza</h3><p>Los instaladores se sugieren para revisión; el borrado automático solo funciona si lo activas expresamente.</p>
             </div>
         </div>
-
-        <!-- Disk Space Overview Bar -->
-        <div id="disk-analyzer-summary-bar">
-            <div class="disk-analyzer-stat-badge">
-                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_status_label">Estado:</span>
-                <span id="disk-analyzer-scan-status" class="disk-analyzer-stat-val" data-i18n="disk_analyzer_ready_status">Listo para escanear</span>
-            </div>
-            <div class="disk-analyzer-stat-badge">
-                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_total_label">Espacio Total:</span>
-                <span id="disk-analyzer-total-space" class="disk-analyzer-stat-val">--</span>
-            </div>
-            <div class="disk-analyzer-space-item">
-                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_used_label">Espacio Usado:</span>
-                <span id="disk-analyzer-used-space" class="disk-analyzer-stat-val">--</span>
-                <div class="disk-analyzer-progress-bg">
-                    <div id="disk-analyzer-used-bar" class="disk-analyzer-progress-fill used" style="width: 0%;"></div>
-                </div>
-            </div>
-            <div class="disk-analyzer-space-item">
-                <span class="disk-analyzer-stat-label" data-i18n="disk_analyzer_free_label">Espacio Libre:</span>
-                <span id="disk-analyzer-free-space" class="disk-analyzer-stat-val">--</span>
-                <div class="disk-analyzer-progress-bg">
-                    <div id="disk-analyzer-free-bar" class="disk-analyzer-progress-fill free" style="width: 0%;"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Workspace (Upper panels + Treemap bottom panel) -->
-        <div id="disk-analyzer-workspace">
-            <div id="disk-analyzer-upper-panels">
-                <!-- Left Panel: Tree View -->
-                <div id="disk-analyzer-tree-panel" class="disk-analyzer-panel">
-                    <div class="disk-analyzer-panel-header">
-                        <div class="disk-analyzer-tab-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                            <span data-i18n="disk_analyzer_tree_title">Vista de Árbol (Carpetas y Archivos)</span>
-                        </div>
-                        <input type="text" id="disk-analyzer-tree-filter" data-i18n-placeholder="disk_analyzer_filter_ph" placeholder="Filtrar por nombre..." class="disk-analyzer-filter-input">
-                    </div>
-                    <div class="disk-analyzer-table-wrapper">
-                        <table class="disk-analyzer-table" id="disk-analyzer-tree-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 32%;" data-i18n="disk_analyzer_th_name">Carpeta / Archivo</th>
-                                    <th style="width: 16%;" data-i18n="disk_analyzer_th_pct">% del Padre</th>
-                                    <th style="width: 14%;" data-i18n="disk_analyzer_th_size">Tamaño</th>
-                                    <th style="width: 11%;" data-i18n="disk_analyzer_th_items">Elementos</th>
-                                    <th style="width: 9%;" data-i18n="disk_analyzer_th_files">Archivos</th>
-                                    <th style="width: 9%;" data-i18n="disk_analyzer_th_folders">Carpetas</th>
-                                    <th style="width: 9%;" data-i18n="disk_analyzer_th_modified">Modificado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="disk-analyzer-tree-body">
-                                <tr>
-                                    <td colspan="7" class="disk-analyzer-empty-cell" data-i18n="disk_analyzer_tree_empty">Haz clic en "Escanear" para analizar la carpeta.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Right Panel: Extension Breakdown -->
-                <div id="disk-analyzer-ext-panel" class="disk-analyzer-panel">
-                    <div class="disk-analyzer-panel-header">
-                        <div class="disk-analyzer-tab-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span data-i18n="disk_analyzer_ext_title">Desglose por Extensión</span>
-                        </div>
-                    </div>
-                    <div class="disk-analyzer-table-wrapper">
-                        <table class="disk-analyzer-table" id="disk-analyzer-ext-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 25%;" data-i18n="disk_analyzer_th_extension">Extensión</th>
-                                    <th style="width: 35%;" data-i18n="disk_analyzer_th_filetype">Tipo de Archivo</th>
-                                    <th style="width: 20%;" data-i18n="disk_analyzer_th_size">Tamaño</th>
-                                    <th style="width: 20%;" data-i18n="disk_analyzer_th_pct_total">% del Total</th>
-                                </tr>
-                            </thead>
-                            <tbody id="disk-analyzer-ext-body">
-                                <tr>
-                                    <td colspan="4" class="disk-analyzer-empty-cell" data-i18n="disk_analyzer_ext_empty">Sin datos.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bottom Panel: Treemap Visualizer -->
-            <div id="disk-analyzer-bottom-panel" class="disk-analyzer-panel">
-                <div class="disk-analyzer-panel-header">
-                    <div class="disk-analyzer-tab-title">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                        <span data-i18n="disk_analyzer_treemap_title">Mapa Treemap Visual (Bloques por Tamaño)</span>
-                    </div>
-                    <div id="disk-analyzer-selected-hover-info" class="disk-analyzer-hover-badge" data-i18n="disk_analyzer_hover_hint">Pasa el cursor sobre un bloque o haz clic para seleccionar</div>
-                </div>
-                <div id="disk-analyzer-treemap-canvas-container" class="disk-analyzer-treemap-canvas-container">
-                    <canvas id="disk-analyzer-treemap-canvas"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Disk Analyzer Footer Bar -->
-        <div id="disk-analyzer-footer">
-            <div id="disk-analyzer-footer-info" class="disk-analyzer-footer-info" data-i18n="disk_analyzer_no_selection">
-                Ningún elemento seleccionado
-            </div>
-            <div class="disk-analyzer-footer-actions">
-                <button type="button" id="btn-disk-analyzer-delete" class="btn btn-secondary btn-danger-accent" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    <span data-i18n="disk_analyzer_delete_btn">Eliminar Elemento</span>
-                </button>
-                <button type="button" id="btn-disk-analyzer-close-footer" class="btn btn-primary" data-i18n="disk_analyzer_close_btn">Cerrar</button>
-            </div>
-        </div>
+        <div class="onboarding-footer"><span id="onboard-step-badge" class="step-badge">Paso 1 de 4</span><div><button type="button" id="btn-onboard-prev" class="btn btn-quiet">Atrás</button><button type="button" id="btn-onboard-next" class="btn btn-primary">Siguiente</button><button type="button" id="btn-onboard-finish" class="btn btn-primary" hidden>Empezar</button></div></div>
     </dialog>
 
-    <!-- SETTINGS & MANAGEMENT MODAL -->
-    <dialog id="settings-modal" class="modal-dialog">
-        <div id="settings-header">
-            <div class="settings-title-group">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
-                <h2 data-i18n="settings_title_modal">Ajustes de Martix</h2>
-            </div>
-            <button type="button" id="btn-close-settings" class="btn-close-modal" data-i18n-title="close_title" title="Cerrar">&times;</button>
+    <dialog id="disk-analyzer-modal" class="modal-dialog modal-full">
+        <div class="modal-header">
+            <div><span class="eyebrow">ANALIZADOR</span><h2 data-i18n="disk_analyzer_title">Uso del espacio</h2></div>
+            <button type="button" id="btn-close-disk-analyzer" class="icon-button" data-i18n-title="close_title" title="Cerrar">×</button>
         </div>
-
-        <div id="settings-tabs">
-            <button type="button" class="tab-btn active" data-tab="topics" data-i18n="tab_topics">Temas</button>
-            <button type="button" class="tab-btn" data-tab="rules" data-i18n="tab_rules">Reglas por extensión</button>
-            <button type="button" class="tab-btn" data-tab="ai" data-i18n="tab_ai">🤖 IA Local (Ollama)</button>
-            <button type="button" class="tab-btn" data-tab="history" data-i18n="tab_history">Historial</button>
-            <button type="button" class="tab-btn" data-tab="duplicates" data-i18n="tab_duplicates">Deduplicar</button>
-            <button type="button" class="tab-btn" data-tab="watched" data-i18n="tab_watched">Carpetas vigiladas</button>
-            <button type="button" class="tab-btn" data-tab="stats" data-i18n="tab_stats">Estadísticas</button>
-            <button type="button" class="tab-btn" data-tab="maintenance" data-i18n="tab_maintenance">Mantenimiento</button>
-            <button type="button" class="tab-btn" data-tab="general" data-i18n="tab_general">General</button>
+        <div class="disk-analyzer-controls">
+            <select id="disk-analyzer-drive-select" class="select-control"></select>
+            <input type="text" id="disk-analyzer-path-input" class="text-control" data-i18n-placeholder="disk_analyzer_input_ph" placeholder="Ruta a escanear (ej. Downloads)">
+            <button type="button" id="btn-disk-analyzer-scan" class="btn btn-primary" data-i18n="disk_analyzer_scan_btn">Escanear</button>
+            <span id="disk-analyzer-scan-status" class="muted"></span>
         </div>
+        <div class="disk-summary-grid"><div><span>Total</span><strong id="disk-analyzer-total-space">--</strong></div><div><span>Usado</span><strong id="disk-analyzer-used-space">--</strong><div class="progress-track"><span id="disk-analyzer-used-bar"></span></div></div><div><span>Libre</span><strong id="disk-analyzer-free-space">--</strong><div class="progress-track"><span id="disk-analyzer-free-bar"></span></div></div></div>
+        <div class="disk-workspace">
+            <section class="disk-panel"><div class="panel-heading"><h3>Carpetas y archivos</h3><input type="text" id="disk-analyzer-tree-filter" class="text-control compact" data-i18n-placeholder="disk_analyzer_filter_ph" placeholder="Filtrar"></div><div class="table-scroll"><table class="disk-table"><thead><tr><th>Nombre</th><th>% padre</th><th>Tamaño</th><th>Elementos</th><th>Archivos</th><th>Carpetas</th><th>Modificado</th></tr></thead><tbody id="disk-analyzer-tree-body"></tbody></table></div></section>
+            <section class="disk-panel"><div class="panel-heading"><h3>Tipos de archivo</h3></div><div class="table-scroll"><table class="disk-table"><thead><tr><th>Extensión</th><th>Tipo</th><th>Tamaño</th><th>% total</th></tr></thead><tbody id="disk-analyzer-ext-body"></tbody></table></div></section>
+        </div>
+        <section class="disk-panel treemap-panel"><div class="panel-heading"><h3>Mapa de uso</h3><span id="disk-analyzer-selected-hover-info" class="muted">Pasa el cursor para inspeccionar</span></div><div class="treemap-container"><canvas id="disk-analyzer-treemap-canvas"></canvas></div></section>
+        <div class="disk-footer"><div id="disk-analyzer-footer-info" class="muted">Ningún elemento seleccionado</div><div><button type="button" id="btn-disk-analyzer-delete" class="btn btn-danger" disabled>Enviar a la papelera</button><button type="button" id="btn-disk-analyzer-close-footer" class="btn btn-primary">Cerrar</button></div></div>
+    </dialog>
 
-        <section id="tab-topics" class="tab-panel">
-            <p class="hint" data-i18n="topics_hint">
-                Un Tema es cualquier concepto que quieras agrupar: tu banco, el gimnasio,
-                facturas de un proveedor... Martix busca palabras clave en el nombre y contenido del archivo.
-            </p>
-            <ul id="topics-list" class="settings-list"></ul>
-            <form id="topic-form" class="settings-form">
-                <label for="topic-name" data-i18n="topic_name_label">Nombre del tema</label>
-                <input type="text" id="topic-name" data-i18n-placeholder="topic_name_placeholder" placeholder="ej. Banco, Gimnasio, Netflix" required>
-
-                <label for="topic-destination" data-i18n="topic_dest_label">Carpeta destino</label>
-                <input type="text" id="topic-destination" data-i18n-placeholder="topic_dest_placeholder" placeholder="ej. Documents/Banco" required>
-
-                <label for="topic-keywords" data-i18n="topic_keywords_label">Palabras clave (separadas por comas)</label>
-                <input type="text" id="topic-keywords" data-i18n-placeholder="topic_keywords_placeholder" placeholder="ej. banco, extracto, iban" required>
-
-                <label for="topic-rename-pattern" data-i18n="topic_rename_label">Patrón de renombrado (opcional)</label>
-                <input type="text" id="topic-rename-pattern" data-i18n-placeholder="topic_rename_placeholder" placeholder="ej. {YYYY}-{MM} - {OriginalName}.{ext}">
-
-                <button type="submit" class="btn btn-primary" data-i18n="add_topic_btn">Añadir tema</button>
-            </form>
-        </section>
-
-        <section id="tab-rules" class="tab-panel" hidden>
-            <p class="hint" data-i18n="rules_hint">
-                Las reglas por extensión son simples y siempre ganan a la clasificación automática: todo archivo con esa extensión va directo a la carpeta que indiques.
-            </p>
-            <div class="rules-actions">
-                <button type="button" id="btn-export-rules" class="btn btn-secondary" data-i18n="export_rules_btn">Exportar reglas (JSON)</button>
-                <button type="button" id="btn-import-rules" class="btn btn-secondary" data-i18n="import_rules_btn">Importar reglas (JSON)</button>
-                <input type="file" id="import-rules-file" accept=".json" style="display: none;">
+    <dialog id="settings-modal" class="modal-dialog settings-dialog">
+        <div class="modal-header"><div><span class="eyebrow">CONFIGURACIÓN</span><h2 data-i18n="settings_title_modal">Ajustes de Martix</h2></div><button type="button" id="btn-close-settings" class="icon-button" data-i18n-title="close_title" title="Cerrar">×</button></div>
+        <div class="settings-layout">
+            <nav id="settings-tabs" class="settings-nav" aria-label="Ajustes">
+                <button type="button" class="tab-btn active" data-tab="topics" data-i18n="tab_topics">Temas</button>
+                <button type="button" class="tab-btn" data-tab="rules" data-i18n="tab_rules">Reglas</button>
+                <button type="button" class="tab-btn" data-tab="general" data-i18n="tab_general">General</button>
+                <button type="button" class="tab-btn" data-tab="history" data-i18n="tab_history">Historial</button>
+                <button type="button" class="tab-btn" data-tab="duplicates" data-i18n="tab_duplicates">Duplicados</button>
+                <button type="button" class="tab-btn" data-tab="watched" data-i18n="tab_watched">Vigiladas</button>
+                <button type="button" class="tab-btn" data-tab="maintenance" data-i18n="tab_maintenance">Mantenimiento</button>
+                <button type="button" class="tab-btn" data-tab="ai" data-i18n="tab_ai">IA local</button>
+                <button type="button" class="tab-btn" data-tab="stats" data-i18n="tab_stats">Estadísticas</button>
+            </nav>
+            <div class="settings-content">
+                <section id="tab-topics" class="tab-panel"><p class="hint" data-i18n="topics_hint">Martix busca temas en nombres y contenido para llevar documentos a carpetas con sentido.</p><ul id="topics-list" class="settings-list"></ul><form id="topic-form" class="settings-form"><label for="topic-name" data-i18n="topic_name_label">Nombre del tema</label><input type="text" id="topic-name" data-i18n-placeholder="topic_name_placeholder" placeholder="ej. Banco, Gimnasio" required><label for="topic-destination" data-i18n="topic_dest_label">Carpeta destino</label><input type="text" id="topic-destination" data-i18n-placeholder="topic_dest_placeholder" placeholder="ej. Documents/Banco" required><label for="topic-keywords" data-i18n="topic_keywords_label">Palabras clave</label><input type="text" id="topic-keywords" data-i18n-placeholder="topic_keywords_placeholder" placeholder="banco, extracto, iban" required><label for="topic-rename-pattern" data-i18n="topic_rename_label">Patrón de renombrado (opcional)</label><input type="text" id="topic-rename-pattern" data-i18n-placeholder="topic_rename_placeholder" placeholder="{YYYY}-{MM} - {OriginalName}.{ext}"><button type="submit" class="btn btn-primary" data-i18n="add_topic_btn">Añadir tema</button></form></section>
+                <section id="tab-rules" class="tab-panel" hidden><p class="hint" data-i18n="rules_hint">Las reglas manuales ganan a la clasificación automática.</p><div class="rules-actions"><button type="button" id="btn-export-rules" class="btn btn-quiet" data-i18n="export_rules_btn">Exportar JSON</button><button type="button" id="btn-import-rules" class="btn btn-quiet" data-i18n="import_rules_btn">Importar JSON</button><input type="file" id="import-rules-file" accept=".json" hidden></div><ul id="rules-list" class="settings-list"></ul><form id="rule-form" class="settings-form"><label for="rule-extension" data-i18n="rule_ext_label">Extensión</label><input type="text" id="rule-extension" data-i18n-placeholder="rule_ext_placeholder" placeholder="ej. pdf" required><label for="rule-destination" data-i18n="rule_dest_label">Carpeta destino</label><input type="text" id="rule-destination" data-i18n-placeholder="rule_dest_placeholder" placeholder="ej. Documents/Facturas" required><label for="rule-rename-pattern" data-i18n="rule_rename_label">Patrón de renombrado (opcional)</label><input type="text" id="rule-rename-pattern" data-i18n-placeholder="rule_rename_placeholder" placeholder="{Category}/{OriginalName}.{ext}"><label data-i18n="rule_conditions_label">Condiciones</label><div id="rule-conditions-container" class="conditions-stack"></div><button type="button" id="btn-add-condition" class="btn btn-small btn-quiet" data-i18n="btn_add_condition">+ Añadir condición</button><button type="submit" class="btn btn-primary" data-i18n="add_rule_btn">Añadir regla</button></form></section>
+                <section id="tab-general" class="tab-panel" hidden><p class="hint" data-i18n="general_hint">Preferencias globales de organización y limpieza.</p><form id="general-settings-form" class="settings-form"><label for="duplicate-action-select" data-i18n="duplicate_action_label">Al encontrar un duplicado</label><select id="duplicate-action-select" class="select-control"><option value="suffix" data-i18n="dup_opt_suffix">Añadir sufijo numérico</option><option value="skip" data-i18n="dup_opt_skip">Omitir movimiento</option><option value="delete_source" data-i18n="dup_opt_delete_source">Enviar original a la papelera</option></select><label for="cleanup-mode-select">Qué hacer con posibles instaladores</label><select id="cleanup-mode-select" class="select-control"><option value="notify" data-i18n="cleanup_mode_notify">Avisar y pedir revisión (recomendado)</option><option value="direct" data-i18n="cleanup_mode_direct">Enviar automáticamente a la papelera</option></select><p class="hint warning-hint">El modo directo requiere que lo actives aquí y usa la papelera, no un borrado irreversible.</p><button type="submit" class="btn btn-primary" data-i18n="save_settings_btn">Guardar ajustes</button></form></section>
+                <section id="tab-history" class="tab-panel" hidden><p class="hint" data-i18n="history_hint">Puedes deshacer movimientos recientes desde este historial.</p><ul id="history-list" class="settings-list history"></ul></section>
+                <section id="tab-duplicates" class="tab-panel" hidden><p class="hint" data-i18n="duplicates_hint">Busca duplicados por contenido y envíalos a la papelera cuando estés seguro.</p><label for="duplicates-folder-input" data-i18n="duplicates_folder_label">Carpetas a analizar</label><input type="text" id="duplicates-folder-input" class="text-control" data-i18n-placeholder="duplicates_folder_placeholder" placeholder="Documents, Downloads"><div class="button-row"><button type="button" id="btn-scan-duplicates" class="btn btn-primary" data-i18n="scan_duplicates_btn">Buscar duplicados</button><button type="button" id="btn-auto-select-duplicates" class="btn btn-quiet" data-i18n="auto_select_btn" disabled>Seleccionar sobrantes</button><button type="button" id="btn-clean-duplicates" class="btn btn-danger" data-i18n="clean_selected_btn" disabled>Enviar seleccionados</button></div><div id="duplicates-loading" class="loading-box" hidden><span class="spinner"></span><p data-i18n="scanning_message">Buscando...</p></div><div id="duplicates-container"><div id="duplicates-empty-msg" class="hint" data-i18n="duplicates_empty" hidden>No se han encontrado duplicados.</div><div id="duplicates-list" class="duplicates-stack"></div></div></section>
+                <section id="tab-watched" class="tab-panel" hidden><p class="hint" data-i18n="watched_hint">Añade carpetas adicionales que Martix organizará al pulsar «Organizar ahora».</p><ul id="watched-folders-list" class="settings-list"></ul><form id="watched-form" class="settings-form"><label for="watched-folder-path" data-i18n="watched_folder_label">Ruta de la carpeta</label><input type="text" id="watched-folder-path" data-i18n-placeholder="watched_folder_placeholder" placeholder="C:\\Users\\TuNombre\\Desktop" required><button type="submit" class="btn btn-primary" data-i18n="add_watched_btn">Añadir carpeta</button></form></section>
+                <section id="tab-maintenance" class="tab-panel" hidden><p class="hint" data-i18n="maintenance_hint">Configura reglas explícitas para limpiar archivos antiguos.</p><ul id="maintenance-list" class="settings-list"></ul><form id="maintenance-form" class="settings-form"><label for="maintenance-folder" data-i18n="maintenance_folder_label">Carpeta</label><input type="text" id="maintenance-folder" data-i18n-placeholder="maintenance_folder_placeholder" placeholder="Downloads/Junk" required><label for="maintenance-age" data-i18n="maintenance_age_label">Edad máxima (días)</label><input type="number" id="maintenance-age" data-i18n-placeholder="maintenance_age_placeholder" placeholder="30" min="1" required><button type="submit" class="btn btn-primary" data-i18n="add_maintenance_rule_btn">Añadir regla</button></form><div class="button-row"><button type="button" id="btn-run-maintenance" class="btn btn-quiet" data-i18n="run_maintenance_btn">Ejecutar ahora</button></div></section>
+                <section id="tab-ai" class="tab-panel" hidden><p class="hint" data-i18n="ai_hint">Ollama es opcional y solo se permite en tu propio equipo.</p><div class="status-pill active" id="ai-status-badge"><span class="dot"></span><span id="ai-status-text">Modo heurístico</span></div><form class="settings-form"><label for="ai-url-input">URL local de Ollama</label><input type="text" id="ai-url-input" value="http://127.0.0.1:11434"><label for="ai-model-input">Modelo local</label><input type="text" id="ai-model-input" value="llama3.2" placeholder="llama3.2"><button type="button" id="btn-test-ai" class="btn btn-primary">Probar conexión local</button></form></section>
+                <section id="tab-stats" class="tab-panel" hidden><p class="hint" data-i18n="stats_hint">Resumen de la actividad de Martix.</p><div class="stats-total"><strong id="stats-total-count">0</strong><span data-i18n="stats_total_label">archivos organizados en total</span></div><h3 data-i18n="stats_top_categories">Categorías principales</h3><div id="stats-categories-chart" class="stats-chart"></div><h3 data-i18n="stats_activity_title">Actividad</h3><div id="stats-activity-chart" class="stats-chart"></div></section>
             </div>
-            <ul id="rules-list" class="settings-list"></ul>
-            <form id="rule-form" class="settings-form">
-                <label for="rule-extension" data-i18n="rule_ext_label">Extensión</label>
-                <input type="text" id="rule-extension" data-i18n-placeholder="rule_ext_placeholder" placeholder="ej. pdf" required>
-
-                <label for="rule-destination" data-i18n="rule_dest_label">Carpeta destino</label>
-                <input type="text" id="rule-destination" data-i18n-placeholder="rule_dest_placeholder" placeholder="ej. Documents/Facturas" required>
-
-                <label for="rule-rename-pattern" data-i18n="rule_rename_label">Patrón de renombrado (opcional)</label>
-                <input type="text" id="rule-rename-pattern" data-i18n-placeholder="rule_rename_placeholder" placeholder="ej. {Category}/{OriginalName}.{ext}">
-
-                <label data-i18n="rule_conditions_label">Condiciones de activación (opcional)</label>
-                <div id="rule-conditions-container" class="conditions-stack"></div>
-                <button type="button" id="btn-add-condition" class="btn btn-small btn-secondary">
-                    + Añadir condición
-                </button>
-
-                <button type="submit" class="btn btn-primary" data-i18n="add_rule_btn">Añadir regla</button>
-            </form>
-        </section>
-
-        <!-- LOCAL AI (OLLAMA) TAB -->
-        <section id="tab-ai" class="tab-panel" hidden>
-            <p class="hint" data-i18n="ai_hint">
-                Conecta Martix a tu servidor de IA Local Ollama para clasificar archivos mediante modelos de lenguaje (LLM) sin enviar ningún dato a la nube.
-            </p>
-            <div class="settings-form">
-                <div class="status-pill active" id="ai-status-badge" style="width: fit-content;">
-                    <span class="dot"></span>
-                    <span id="ai-status-text">Ollama (Modo Heurístico Activo / Local)</span>
-                </div>
-
-                <label for="ai-url-input">URL del servidor Ollama Local</label>
-                <input type="text" id="ai-url-input" value="http://localhost:11434">
-
-                <label for="ai-model-input">Modelo Ollama deseado</label>
-                <input type="text" id="ai-model-input" value="llama3" placeholder="ej. llama3, mistral, gemma">
-
-                <button type="button" id="btn-test-ai" class="btn btn-primary">🔍 Probar conexión con Ollama</button>
-            </div>
-        </section>
-
-        <section id="tab-history" class="tab-panel" hidden>
-            <p class="hint" data-i18n="history_hint">
-                Últimos movimientos de Martix. Si un archivo acabó donde no debía, pulsa «Deshacer» o «Aprender de corrección».
-            </p>
-            <ul id="history-list" class="settings-list history"></ul>
-        </section>
-
-        <section id="tab-general" class="tab-panel" hidden>
-            <p class="hint" data-i18n="general_hint">
-                Ajustes globales del sistema para gestionar archivos duplicados e integraciones.
-            </p>
-            <form id="general-settings-form" class="settings-form">
-                <label for="duplicate-action-select" data-i18n="duplicate_action_label">Acción al encontrar archivos idénticos en destino</label>
-                <select id="duplicate-action-select" class="lang-select full-width">
-                    <option value="suffix" data-i18n="dup_opt_suffix">Añadir sufijo numérico, ej. archivo (1).pdf</option>
-                    <option value="skip" data-i18n="dup_opt_skip">Omitir movimiento (dejar en Descargas)</option>
-                    <option value="delete_source" data-i18n="dup_opt_delete_source">Eliminar archivo original (ya guardado)</option>
-                </select>
-                
-                <button type="submit" class="btn btn-primary" data-i18n="save_settings_btn">Guardar ajustes</button>
-            </form>
-        </section>
-
-        <section id="tab-duplicates" class="tab-panel" hidden>
-            <p class="hint" data-i18n="duplicates_hint">
-                Escanea y elimina archivos duplicados para liberar espacio.
-            </p>
-            
-            <div class="form-group">
-                <label for="duplicates-folder-input" data-i18n="duplicates_folder_label">Carpetas a analizar (opcional, separadas por comas):</label>
-                <input type="text" id="duplicates-folder-input" data-i18n-placeholder="duplicates_folder_placeholder" placeholder="ej. Documents, Downloads">
-            </div>
-
-            <div class="duplicates-actions">
-                <button type="button" id="btn-scan-duplicates" class="btn btn-primary" data-i18n="scan_duplicates_btn">Buscar duplicados</button>
-                <button type="button" id="btn-auto-select-duplicates" class="btn btn-secondary" data-i18n="auto_select_btn" disabled>Seleccionar todos menos uno</button>
-                <button type="button" id="btn-clean-duplicates" class="btn btn-danger" data-i18n="clean_selected_btn" disabled>Limpiar seleccionados</button>
-            </div>
-
-            <div id="duplicates-loading" class="loading-spinner-box" style="display: none;">
-                <div class="spinner"></div>
-                <p data-i18n="scanning_message">Buscando archivos duplicados...</p>
-            </div>
-
-            <div id="duplicates-container">
-                <div id="duplicates-empty-msg" class="hint text-center" data-i18n="duplicates_empty" style="display: none;">
-                    No se han encontrado archivos duplicados.
-                </div>
-                <div id="duplicates-list" class="duplicates-stack"></div>
-            </div>
-        </section>
-
-        <section id="tab-maintenance" class="tab-panel" hidden>
-            <p class="hint" data-i18n="maintenance_hint">Configure rules to automatically delete files from specified folders after a certain number of days.</p>
-            <ul id="maintenance-list" class="settings-list"></ul>
-            <form id="maintenance-form" class="settings-form">
-                <label for="maintenance-folder" data-i18n="maintenance_folder_label">Carpeta</label>
-                <input type="text" id="maintenance-folder" data-i18n-placeholder="maintenance_folder_placeholder" placeholder="ej. Downloads/Junk" required>
-
-                <label for="maintenance-age" data-i18n="maintenance_age_label">Edad máxima (días)</label>
-                <input type="number" id="maintenance-age" data-i18n-placeholder="maintenance_age_placeholder" placeholder="ej. 30" required min="1">
-
-                <button type="submit" class="btn btn-primary" data-i18n="add_maintenance_rule_btn">Añadir regla</button>
-            </form>
-            <div class="maintenance-actions">
-                <button type="button" id="btn-run-maintenance" class="btn btn-secondary" data-i18n="run_maintenance_btn">Ejecutar mantenimiento ahora</button>
-            </div>
-        </section>
-
-        <section id="tab-watched" class="tab-panel" hidden>
-            <p class="hint" data-i18n="watched_hint">
-                Añade carpetas adicionales que Martix organizará en tiempo real y al pulsar «Organizar ahora».
-            </p>
-            <ul id="watched-folders-list" class="settings-list"></ul>
-            <form id="watched-form" class="settings-form">
-                <label for="watched-folder-path" data-i18n="watched_folder_label">Ruta de la carpeta</label>
-                <input type="text" id="watched-folder-path" data-i18n-placeholder="watched_folder_placeholder" placeholder="ej. /home/user/Desktop" required>
-                <button type="submit" class="btn btn-primary" data-i18n="add_watched_btn">Añadir carpeta</button>
-            </form>
-        </section>
-
-        <section id="tab-stats" class="tab-panel" hidden>
-            <p class="hint" data-i18n="stats_hint">
-                Resumen de la actividad de Martix.
-            </p>
-            <div id="stats-total" class="stats-big-number">
-                <span class="stats-number" id="stats-total-count">0</span>
-                <span class="stats-label" data-i18n="stats_total_label">archivos organizados en total</span>
-            </div>
-            <div id="stats-categories">
-                <h3 data-i18n="stats_top_categories">Categorías principales</h3>
-                <div id="stats-categories-chart"></div>
-            </div>
-            <div id="stats-activity">
-                <h3 data-i18n="stats_activity_title">Actividad (últimos 30 días)</h3>
-                <div id="stats-activity-chart"></div>
-            </div>
-        </section>
+        </div>
     </dialog>
 
     <script src="app.js"></script>

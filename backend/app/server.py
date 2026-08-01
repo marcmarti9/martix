@@ -6,7 +6,6 @@ import atexit
 import logging
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -14,14 +13,14 @@ from app import browser, db, llm, security, trash
 from app.organizer import (
     find_duplicates,
     invalidate_scan_dirs_cache,
-    organize_directory,
-    resolve_destination_folder,
+    organize_directory_report,
+    simulate_directory,
     undo_move,
 )
 from app.scheduler import scheduler
 from app.watcher import PatrolManager
 from config import settings as llm_settings
-from config.settings import DOWNLOADS_DIR, IGNORED_SUFFIXES, PROJECT_DIR, HOST, PORT
+from config.settings import DOWNLOADS_DIR, PROJECT_DIR, HOST
 
 logger = logging.getLogger("martix.server")
 
@@ -69,7 +68,11 @@ def _safe_delete_target(raw_path) -> tuple[Path | None, tuple[dict, int] | None]
 
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
-    app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
+    app.config.update(
+        MAX_CONTENT_LENGTH=MAX_REQUEST_BYTES,
+        MAX_FORM_MEMORY_SIZE=256 * 1024,
+        MAX_FORM_PARTS=100,
+    )
 
     @app.before_request
     def guard_request():
@@ -150,38 +153,41 @@ def create_app() -> Flask:
 
     @app.post("/api/simulate")
     def simulate():
-        """Dry-run: classify every file in DOWNLOADS_DIR without moving."""
-        results = []
-        if DOWNLOADS_DIR.exists():
-            rules = db.list_rules()  # una sola lectura para todo el listado
-            for entry in sorted(DOWNLOADS_DIR.iterdir()):
-                if not entry.is_file() or entry.suffix.lower() in IGNORED_SUFFIXES:
-                    continue
-                category, relative_folder, _rename = resolve_destination_folder(entry, rules=rules)
-                dest_dir = security.safe_destination_dir(relative_folder)
-                results.append({
-                    "filename": entry.name,
-                    "current_path": str(entry),
-                    "would_move_to": str(dest_dir / entry.name) if dest_dir else None,
-                    "category": category,
-                })
-        return jsonify(results)
+        """Dry-run: preview direct and nested files without moving anything."""
+        return jsonify(simulate_directory(DOWNLOADS_DIR))
 
     @app.post("/api/organize-now")
     def organize_now():
-        moved = organize_directory(DOWNLOADS_DIR)
+        report = organize_directory_report(DOWNLOADS_DIR)
+        moved = list(report["items"])
+        review = list(report["review"])
+        skipped = list(report["skipped"])
+        truncated = bool(report.get("truncated"))
         # Also organize files from all active watched folders
         try:
             watched = db.list_watched_folders()
             for wf in watched:
                 if not wf["active"]:
                     continue
-                folder_path = Path(wf["folder_path"])
-                if folder_path.exists() and folder_path.is_dir():
-                    moved.extend(organize_directory(folder_path))
+                folder_path = browser.resolve_safe_path(wf.get("folder_path", ""))
+                if folder_path and folder_path.exists() and folder_path.is_dir():
+                    watched_report = organize_directory_report(folder_path)
+                    moved.extend(watched_report["items"])
+                    review.extend(watched_report["review"])
+                    skipped.extend(watched_report["skipped"])
+                    truncated = truncated or bool(watched_report.get("truncated"))
         except Exception:
             logger.debug("watched folders not available yet, skipping")
-        return jsonify({"moved": len(moved), "items": moved})
+        return jsonify({
+            "moved": len(moved),
+            "items": moved,
+            "review": review,
+            "review_count": len(review),
+            "skipped": skipped,
+            "skipped_count": len(skipped),
+            "truncated": truncated,
+            "cleanup_suggestions": db.list_cleanup_suggestions("pending"),
+        })
 
     @app.get("/api/rules")
     def get_rules():
@@ -423,10 +429,12 @@ def create_app() -> Flask:
     def _settings_payload():
         return {
             "duplicate_action": db.get_setting("duplicate_action", "suffix"),
+            "cleanup_mode": db.get_setting("cleanup_mode", "notify"),
             "onboarded": db.get_setting("onboarded", "0") == "1",
             "unpack_archives": str(db.get_setting("unpack_archives", "true")).lower() in ("true", "1"),
             "watch_recursive": db.get_setting("watch_recursive", "0") == "1",
             "native_trash": trash.native_trash_available(),
+            "pending_cleanup": len(db.list_cleanup_suggestions("pending", limit=500)),
         }
 
     @app.get("/api/settings")
@@ -440,6 +448,10 @@ def create_app() -> Flask:
             action = payload["duplicate_action"]
             if action in ("suffix", "skip", "delete_source"):
                 db.set_setting("duplicate_action", action)
+        if "cleanup_mode" in payload:
+            mode = payload["cleanup_mode"]
+            if mode in ("notify", "direct"):
+                db.set_setting("cleanup_mode", mode)
         if "onboarded" in payload:
             db.set_setting("onboarded", "1" if payload["onboarded"] else "0")
         if "unpack_archives" in payload:
@@ -450,13 +462,53 @@ def create_app() -> Flask:
             patrol.update_watched_folders()
         return jsonify(_settings_payload())
 
+    @app.get("/api/cleanup-suggestions")
+    def get_cleanup_suggestions():
+        status = request.args.get("status", "pending")
+        if status not in {"pending", "dismissed", "deleted", "missing", "all"}:
+            return jsonify({"error": "estado no valido"}), 400
+        return jsonify(db.list_cleanup_suggestions(None if status == "all" else status))
+
+    @app.post("/api/cleanup-suggestions/<int:suggestion_id>/dismiss")
+    def dismiss_cleanup_suggestion(suggestion_id: int):
+        suggestion = db.get_cleanup_suggestion(suggestion_id)
+        if suggestion is None:
+            return jsonify({"error": "sugerencia no encontrada"}), 404
+        return jsonify(db.resolve_cleanup_suggestion(suggestion_id, "dismissed"))
+
+    @app.post("/api/cleanup-suggestions/<int:suggestion_id>/delete")
+    def delete_cleanup_suggestion(suggestion_id: int):
+        suggestion = db.get_cleanup_suggestion(suggestion_id)
+        if suggestion is None:
+            return jsonify({"error": "sugerencia no encontrada"}), 404
+
+        resolved = browser.resolve_safe_path(suggestion.get("path", ""))
+        if resolved is None or security.is_protected_path(resolved):
+            db.resolve_cleanup_suggestion(suggestion_id, "missing")
+            return jsonify({"error": "ruta no permitida o protegida"}), 403
+        if not resolved.exists():
+            db.resolve_cleanup_suggestion(suggestion_id, "missing")
+            return jsonify({"error": "el archivo ya no existe"}), 404
+        if not resolved.is_file() or resolved.is_symlink():
+            return jsonify({"error": "solo se pueden retirar archivos normales"}), 400
+
+        try:
+            outcome = trash.move_to_trash(resolved)
+        except OSError as exc:
+            logger.exception("no se pudo enviar la sugerencia a la papelera")
+            return jsonify({"error": f"no se pudo enviar a la papelera: {exc}"}), 500
+
+        updated = db.resolve_cleanup_suggestion(suggestion_id, "deleted")
+        return jsonify({
+            "success": True,
+            "suggestion": updated,
+            "trash_method": outcome["method"],
+            "trash_id": outcome["entry_id"],
+        })
+
     @app.get("/api/llm/status")
     def get_llm_status():
-        return jsonify({
-            "enabled": llm_settings.LLM_ENABLED,
-            "url": llm_settings.LLM_URL,
-            "model": llm_settings.LLM_MODEL,
-        })
+        return jsonify(llm.status())
 
     @app.post("/api/llm/test")
     def test_llm_connection():
@@ -760,59 +812,38 @@ def create_app() -> Flask:
 
     @app.get("/api/version")
     def get_version():
-        commit = ""
-        try:
-            res = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False)
-            commit = res.stdout.strip()
-        except Exception:
-            pass
-        return jsonify({"version": "2026.07.25", "commit": commit})
-
-    _update_check_cache = {"timestamp": 0, "result": None}
+        # Version information is local-only.  The old endpoint executed
+        # ``git fetch`` from a UI request, which broke the zero-network
+        # guarantee and was unusable in a frozen executable.
+        return jsonify({"version": "2026.08.01", "commit": "", "packaged": bool(getattr(sys, "frozen", False))})
 
     @app.get("/api/update/check")
     def check_update():
-        now = time.time()
-        if _update_check_cache["result"] and (now - _update_check_cache["timestamp"] < 30):
-            return jsonify(_update_check_cache["result"])
-
-        head_commit, remote_commit = "", ""
-        update_available = False
-        try:
-            subprocess.run(["git", "fetch", "origin", "main"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False, timeout=5)
-            res_head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False)
-            res_remote = subprocess.run(["git", "rev-parse", "--short", "origin/main"], cwd=str(PROJECT_DIR), capture_output=True, text=True, check=False)
-            head_commit = res_head.stdout.strip()
-            remote_commit = res_remote.stdout.strip()
-            if head_commit and remote_commit and head_commit != remote_commit:
-                update_available = True
-        except Exception:
-            pass
-
-        result = {
-            "update_available": update_available,
-            "current_commit": head_commit,
-            "latest_commit": remote_commit,
-            "message": "Actualización disponible" if update_available else "Martix está actualizado"
-        }
-        _update_check_cache["timestamp"] = now
-        _update_check_cache["result"] = result
-        return jsonify(result)
+        return jsonify({
+            "update_available": False,
+            "message": "Las actualizaciones se distribuyen con el instalador de Martix.",
+            "network_disabled": True,
+        })
 
     @app.post("/api/update/apply")
     def apply_update():
-        def _run():
-            installer_script = PROJECT_DIR / "installer.py"
-            subprocess.run([sys.executable, str(installer_script), "update"], check=False)
-
-        threading.Thread(target=_run, daemon=True).start()
-        return jsonify({"success": True, "message": "Iniciando actualización en segundo plano..."})
+        return jsonify({
+            "success": False,
+            "message": "Las actualizaciones se instalan mediante un nuevo instalador.",
+            "network_disabled": True,
+        }), 410
 
     return app
 
 
 
 def resume_patrol_if_needed() -> None:
+    # La deteccion es local y rapida: si Ollama esta instalado y el equipo
+    # tiene recursos, se habilita sin exigir una variable de entorno.
+    try:
+        llm.initialize()
+    except Exception:
+        logger.debug("no se pudo inicializar el clasificador LLM local", exc_info=True)
     if db.get_setting("patrol_active", "0") == "1":
         patrol.start()
     if db.get_setting("scheduler_enabled", "1") == "1":

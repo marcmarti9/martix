@@ -25,6 +25,7 @@ venv/
 htmlcov/
 
 # --- Empaquetado ----------------------------------------------------------
+Martix.exe
 backend/build/
 backend/dist/
 build/

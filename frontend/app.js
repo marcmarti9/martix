@@ -3,10 +3,8 @@
    contenido real de la carpeta seleccionada; ajustes en un dialog aparte. */
 
 (function initTheme() {
-    const theme = localStorage.getItem("martix_theme") || localStorage.getItem("sortix_theme") || "dark";
-    if (theme === "light") {
-        document.documentElement.classList.add("light");
-    }
+    const theme = localStorage.getItem("martix_theme") || localStorage.getItem("sortix_theme") || "light";
+    document.documentElement.classList.toggle("dark", theme === "dark");
 })();
 
 const TRANSLATIONS = {
@@ -37,8 +35,15 @@ const TRANSLATIONS = {
         add_rule_btn: "Añadir regla",
         tab_general: "General",
         general_hint: "Ajustes globales del sistema para gestionar archivos duplicados e integraciones.",
+        cleanup_mode_notify: "Avisar y pedir revisión (recomendado)",
+        cleanup_mode_direct: "Enviar automáticamente a la papelera",
+        cleanup_delete_btn: "Enviar a papelera",
+        cleanup_dismiss_btn: "Descartar",
+        cleanup_deleted: "Archivo enviado a la papelera.",
+        cleanup_dismissed: "Sugerencia descartada.",
+        cleanup_empty: "No hay sugerencias pendientes.",
         tab_ai: "🤖 IA Local (Ollama)",
-        ai_hint: "Conecta Martix a tu servidor de IA Local Ollama para clasificar archivos mediante modelos de lenguaje (LLM) sin enviar ningún dato a la nube.",
+        ai_hint: "Martix detecta Ollama local automáticamente cuando el equipo puede usarlo; tus archivos no salen a la nube.",
         ai_status_enabled: "Ollama activado (modo LLM)",
         ai_status_disabled: "Ollama desactivado (modo heurístico)",
         ai_testing: "Probando...",
@@ -100,13 +105,17 @@ const TRANSLATIONS = {
         installers: "Instaladores",
         documents: "Documentos",
         other: "Otros",
+        code: "Desarrollo",
+        books: "Libros",
+        fonts: "Fuentes",
+        data: "Datos",
         
         status_conn_error: "No se pudo contactar con Martix.",
         status_patrol_active: "Patrulla activa: vigilando Descargas.",
         status_patrol_inactive: "Patrulla desactivada.",
         status_patrol_error: "No se pudo cambiar la Patrulla Activa.",
         status_organizing: "Organizando...",
-        status_organized_done: "Listo: {moved} archivo(s) organizado(s).",
+        status_organized_done: "Listo: {moved} archivo(s) organizado(s); {review} para revisar.",
         status_organize_error: "Fallo al organizar la carpeta de descargas.",
         status_folder_error: "No se pudo abrir esa carpeta.",
         
@@ -174,6 +183,7 @@ const TRANSLATIONS = {
         simulate_title: "Simular organización",
         status_simulating: "Simulando...",
         simulate_modal_title: "Resultado de la simulación",
+        organize_report_title: "Resultado de la organización",
         simulate_no_changes: "No se moverían archivos.",
         simulate_move_label: "se movería a",
         simulate_close_btn: "Cerrar",
@@ -211,7 +221,13 @@ const TRANSLATIONS = {
         help_title: "Ver tutorial y guía paso a paso",
         settings_btn: "Ajustes y Reglas",
         settings_title: "Configurar reglas, temas, deduplicador y mantenimiento",
-        sidebar_folders_title: "EXPLORADOR DE CARPETAS",
+        sidebar_folders_title: "LUGARES",
+        sidebar_subtitle: "Accesos rápidos",
+        content_eyebrow: "UBICACIÓN",
+        content_description: "Tus carpetas importantes, en un solo lugar.",
+        folder_view_description: "Contenido de esta carpeta.",
+        open_folder: "Abrir carpeta",
+        folder_label: "Carpeta",
         empty_state_title: "Carpeta sin archivos",
         theme_dark: "Oscuro",
         theme_light: "Claro",
@@ -300,7 +316,13 @@ const TRANSLATIONS = {
         help_title: "View step-by-step tutorial and guide",
         settings_btn: "Settings & Rules",
         settings_title: "Configure rules, topics, deduplication and maintenance",
-        sidebar_folders_title: "FOLDER EXPLORER",
+        sidebar_folders_title: "PLACES",
+        sidebar_subtitle: "Quick access",
+        content_eyebrow: "LOCATION",
+        content_description: "Your important folders, in one place.",
+        folder_view_description: "Contents of this folder.",
+        open_folder: "Open folder",
+        folder_label: "Folder",
         empty_state_title: "Empty Folder",
         theme_dark: "Dark",
         theme_light: "Light",
@@ -383,8 +405,15 @@ const TRANSLATIONS = {
         add_rule_btn: "Add rule",
         tab_general: "General",
         general_hint: "Global system settings to manage duplicate files and integrations.",
+        cleanup_mode_notify: "Notify and ask for review (recommended)",
+        cleanup_mode_direct: "Automatically send to the trash",
+        cleanup_delete_btn: "Send to trash",
+        cleanup_dismiss_btn: "Dismiss",
+        cleanup_deleted: "File sent to the trash.",
+        cleanup_dismissed: "Suggestion dismissed.",
+        cleanup_empty: "No pending suggestions.",
         tab_ai: "🤖 Local AI (Ollama)",
-        ai_hint: "Connect Martix to your local Ollama AI server to classify files using language models (LLM) without sending any data to the cloud.",
+        ai_hint: "Martix detects local Ollama automatically when the computer can run it; your files never go to the cloud.",
         ai_status_enabled: "Ollama enabled (LLM mode)",
         ai_status_disabled: "Ollama disabled (heuristic mode)",
         ai_testing: "Testing...",
@@ -446,13 +475,17 @@ const TRANSLATIONS = {
         installers: "Installers",
         documents: "Documents",
         other: "Other",
+        code: "Development",
+        books: "Books",
+        fonts: "Fonts",
+        data: "Data",
         
         status_conn_error: "Could not connect to Sortix.",
         status_patrol_active: "Patrol active: watching Downloads.",
         status_patrol_inactive: "Patrol deactivated.",
         status_patrol_error: "Could not toggle Active Patrol.",
         status_organizing: "Organizing...",
-        status_organized_done: "Done: {moved} file(s) organized.",
+        status_organized_done: "Done: {moved} file(s) organized; {review} need review.",
         status_organize_error: "Failed to organize downloads folder.",
         status_folder_error: "Could not open that folder.",
         
@@ -519,6 +552,7 @@ const TRANSLATIONS = {
         simulate_title: "Simulate organization",
         status_simulating: "Simulating...",
         simulate_modal_title: "Simulation results",
+        organize_report_title: "Organization report",
         simulate_no_changes: "No files would be moved.",
         simulate_move_label: "would move to",
         simulate_close_btn: "Close",
@@ -738,7 +772,7 @@ function applyLanguage() {
 }
 
 // ---- tema claro/oscuro (rdsx style) ---------------------------------------
-let currentTheme = localStorage.getItem("martix_theme") || localStorage.getItem("sortix_theme") || "dark";
+let currentTheme = localStorage.getItem("martix_theme") || localStorage.getItem("sortix_theme") || "light";
 
 function updateThemeButton() {
     const container = document.getElementById("theme-btn-svg-container");
@@ -757,11 +791,7 @@ function toggleTheme() {
     const switchTheme = () => {
         currentTheme = nextTheme;
         localStorage.setItem("martix_theme", currentTheme);
-        if (currentTheme === "light") {
-            document.documentElement.classList.add("light");
-        } else {
-            document.documentElement.classList.remove("light");
-        }
+        document.documentElement.classList.toggle("dark", currentTheme === "dark");
         updateThemeButton();
     };
 
@@ -781,6 +811,10 @@ const ICONS = {
     audio: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
     archive: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v5M9 13h2"/>',
     installer: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    code: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>',
+    book: '<path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v17H7.5A2.5 2.5 0 0 0 5 21.5z"/><path d="M5 4.5v17M8 6h8"/>',
+    font: '<path d="M4 19 10 5h4l6 14M7 14h10"/>',
+    data: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/>',
     document: '<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/>',
     pdf: '<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><text x="8" y="17" font-size="6" fill="currentColor" stroke="none">PDF</text>',
     other: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 7l3-4h5l2 3h8"/>',
@@ -812,6 +846,10 @@ const EXT_TO_ICON = {
     exe: "installer", msi: "installer", deb: "installer", rpm: "installer", appimage: "installer", dmg: "installer", pkg: "installer", apk: "installer",
     pdf: "pdf",
     doc: "document", docx: "document", odt: "document", txt: "document", ppt: "document", pptx: "document", xls: "document", xlsx: "document", csv: "document", rtf: "document",
+    py: "code", js: "code", mjs: "code", cjs: "code", ts: "code", tsx: "code", jsx: "code", html: "code", htm: "code", css: "code", scss: "code", java: "code", kt: "code", c: "code", h: "code", cpp: "code", cs: "code", go: "code", rs: "code", rb: "code", php: "code", swift: "code", dart: "code", sh: "code", ps1: "code", bat: "code", sql: "code",
+    epub: "book", mobi: "book", azw: "book", azw3: "book", djvu: "book",
+    ttf: "font", otf: "font", woff: "font", woff2: "font",
+    json: "data", xml: "data", yaml: "data", yml: "data", toml: "data", sqlite: "data", sqlite3: "data", db: "data",
 };
 
 function iconForFile(ext) {
@@ -844,6 +882,11 @@ const breadcrumbsEl = document.getElementById("breadcrumbs");
 const folderTreeEl = document.getElementById("folder-tree");
 const fileGridEl = document.getElementById("file-grid");
 const emptyStateEl = document.getElementById("empty-state");
+const contentTitleEl = document.getElementById("content-title");
+const contentDescriptionEl = document.getElementById("content-description");
+const cleanupPanelEl = document.getElementById("cleanup-panel");
+const cleanupCountEl = document.getElementById("cleanup-count");
+const cleanupSuggestionsEl = document.getElementById("cleanup-suggestions-list");
 
 const settingsModal = document.getElementById("settings-modal");
 const topicsListEl = document.getElementById("topics-list");
@@ -858,6 +901,10 @@ const watchedListEl = document.getElementById("watched-folders-list");
 const watchedForm = document.getElementById("watched-form");
 
 let statusTimer = null;
+let simulationRows = [];
+let simulationPage = 0;
+const SIMULATION_PAGE_SIZE = 100;
+
 function showStatus(message, isError = false) {
     statusMessageEl.textContent = message;
     statusMessageEl.classList.toggle("error", isError);
@@ -865,13 +912,68 @@ function showStatus(message, isError = false) {
     statusTimer = setTimeout(() => { statusMessageEl.textContent = ""; }, 6000);
 }
 
+async function refreshCleanupSuggestions() {
+    if (!cleanupPanelEl || !cleanupSuggestionsEl) return;
+    try {
+        const suggestions = await fetchJSON("/api/cleanup-suggestions");
+        cleanupCountEl.textContent = suggestions.length;
+        cleanupPanelEl.hidden = suggestions.length === 0;
+        cleanupSuggestionsEl.innerHTML = suggestions.length
+            ? suggestions.map(item => `
+                <div class="cleanup-item" data-suggestion-id="${Number(item.id)}">
+                    <div class="cleanup-item-main">
+                        <strong>${escapeHtml(item.filename)}</strong>
+                        <span>${escapeHtml(item.reason)} · ${escapeHtml(item.path)}</span>
+                    </div>
+                    <div class="cleanup-item-actions">
+                        <button type="button" class="btn btn-danger cleanup-delete" data-id="${Number(item.id)}">${escapeHtml(t("cleanup_delete_btn"))}</button>
+                        <button type="button" class="btn btn-quiet cleanup-dismiss" data-id="${Number(item.id)}">${escapeHtml(t("cleanup_dismiss_btn"))}</button>
+                    </div>
+                </div>
+            `).join("")
+            : `<p class="hint">${escapeHtml(t("cleanup_empty"))}</p>`;
+
+        cleanupSuggestionsEl.querySelectorAll(".cleanup-delete").forEach(button => {
+            button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    await fetchJSON(`/api/cleanup-suggestions/${Number(button.dataset.id)}/delete`, { method: "POST" });
+                    showStatus(t("cleanup_deleted"));
+                    await refreshCleanupSuggestions();
+                } catch (err) {
+                    button.disabled = false;
+                    showStatus(err.message, true);
+                }
+            });
+        });
+        cleanupSuggestionsEl.querySelectorAll(".cleanup-dismiss").forEach(button => {
+            button.addEventListener("click", async () => {
+                try {
+                    await fetchJSON(`/api/cleanup-suggestions/${Number(button.dataset.id)}/dismiss`, { method: "POST" });
+                    showStatus(t("cleanup_dismissed"));
+                    await refreshCleanupSuggestions();
+                } catch (err) {
+                    showStatus(err.message, true);
+                }
+            });
+        });
+    } catch (err) {
+        console.warn("No se pudieron cargar las sugerencias de limpieza", err);
+    }
+}
+
 // Si Martix esta configurado con MARTIX_TOKEN (p.ej. expuesto en la LAN),
 // la API responde 401 hasta que el navegador presente el token. Se pide una
-// vez y se guarda en localStorage.
+// una vez y se conserva solo durante la ventana actual.
 function withToken(options) {
-    const token = localStorage.getItem("martix_token") || localStorage.getItem("sortix_token");
-    if (!token) return options;
-    return { ...(options || {}), headers: { ...((options || {}).headers || {}), "X-Martix-Token": token, "X-Sortix-Token": token } };
+    // Tokens are only kept for the current window. Persisting a LAN/API token
+    // in localStorage made it recoverable by any later script running in this
+    // origin; the desktop build does not need a token at all.
+    const token = sessionStorage.getItem("martix_token") || sessionStorage.getItem("sortix_token");
+    const base = options || {};
+    const headers = { ...(base.headers || {}), "X-Martix-Client": "martix-ui" };
+    if (!token) return { ...base, headers };
+    return { ...base, headers: { ...headers, "X-Martix-Token": token, "X-Sortix-Token": token } };
 }
 
 async function fetchJSON(url, options) {
@@ -879,7 +981,7 @@ async function fetchJSON(url, options) {
     if (res.status === 401) {
         const token = prompt("Esta instancia de Martix esta protegida.\nIntroduce el token de acceso (MARTIX_TOKEN):");
         if (token) {
-            localStorage.setItem("martix_token", token.trim());
+            sessionStorage.setItem("martix_token", token.trim());
             res = await fetch(url, withToken(options));
         }
     }
@@ -945,7 +1047,7 @@ function safeNumber(value, fallback = 0) {
 
 // Solo permite colores en formato #rgb / #rrggbb; cualquier otra cosa cae al
 // gris neutro en vez de inyectarse tal cual en el atributo style.
-function safeColor(value, fallback = "#94a3b8") {
+function safeColor(value, fallback = "#8d8b85") {
     return /^#[0-9a-fA-F]{3,8}$/.test(String(value || "")) ? String(value) : fallback;
 }
 
@@ -1001,6 +1103,16 @@ async function navigateTo(path) {
 async function renderContent() {
     fileGridEl.innerHTML = "";
     emptyStateEl.hidden = true;
+    if (contentTitleEl) {
+        contentTitleEl.textContent = currentPath === null
+            ? t("home", "Inicio")
+            : labelForPath(currentPath);
+    }
+    if (contentDescriptionEl) {
+        contentDescriptionEl.textContent = currentPath === null
+            ? t("content_description", "Tus carpetas importantes, en un solo lugar.")
+            : t("folder_view_description", "Contenido de esta carpeta.");
+    }
 
     if (currentPath === null) {
         renderRootTiles();
@@ -1027,9 +1139,12 @@ function renderRootTiles() {
         const card = document.createElement("div");
         card.className = "category-card";
         card.innerHTML = `
-            <div class="category-card-icon">${svgIcon(item.icon)}</div>
-            <span class="category-card-title">${escapeHtml(t(item.key, item.label))}</span>
-            <span class="category-card-count">${item.count !== undefined ? item.count + ' ' + t("files_suffix", "archivos") : ''}</span>
+            <span class="category-card-icon">${svgIcon(item.icon)}</span>
+            <span class="category-card-copy">
+                <span class="category-card-title">${escapeHtml(t(item.key, item.label))}</span>
+                <span class="category-card-count">${item.count !== undefined ? item.count + ' ' + t("files_suffix", "archivos") : t("open_folder", "Abrir carpeta")}</span>
+            </span>
+            <span class="category-card-action" aria-hidden="true">${svgIcon("chevron")}</span>
         `;
         card.addEventListener("click", () => navigateTo(item.path));
         fileGridEl.appendChild(card);
@@ -1040,12 +1155,20 @@ function buildTile(entry) {
     const tile = document.createElement("div");
     if (entry.is_dir) {
         tile.className = "tile folder-tile";
-        tile.innerHTML = `${svgIcon("folder", "tile-icon")}<span class="tile-name">${escapeHtml(entry.name)}</span>`;
+        tile.innerHTML = `
+            <span class="tile-leading">${svgIcon("folder", "tile-icon")}</span>
+            <span class="tile-info"><span class="tile-name">${escapeHtml(entry.name)}</span><span class="tile-meta">${escapeHtml(t("folder_label", "Carpeta"))}</span></span>
+            <span class="tile-action" aria-hidden="true">${svgIcon("chevron")}</span>
+        `;
         tile.addEventListener("click", () => navigateTo(entry.path));
     } else {
         tile.className = "tile file-tile";
         tile.title = `${entry.name} - ${formatSize(entry.size)} - ${entry.modified}`;
-        tile.innerHTML = `${svgIcon(iconForFile(entry.ext), "tile-icon")}<span class="tile-name">${escapeHtml(entry.name)}</span><span class="tile-meta">${formatSize(entry.size)}</span>`;
+        tile.innerHTML = `
+            <span class="tile-leading">${svgIcon(iconForFile(entry.ext), "tile-icon")}</span>
+            <span class="tile-info"><span class="tile-name">${escapeHtml(entry.name)}</span><span class="tile-meta">${formatSize(entry.size)}${entry.modified ? ` · ${escapeHtml(entry.modified)}` : ""}</span></span>
+            <span class="tile-size">${formatSize(entry.size)}</span>
+        `;
     }
     return tile;
 }
@@ -1096,7 +1219,28 @@ organizeBtn.addEventListener("click", async () => {
     showStatus(t("status_organizing"));
     try {
         const data = await fetchJSON("/api/organize-now", { method: "POST" });
-        showStatus(t("status_organized_done").replace("{moved}", data.moved));
+        const reviewCount = Number(data.review_count ?? (Array.isArray(data.review) ? data.review.length : 0));
+        let doneMessage = t("status_organized_done")
+            .replace("{moved}", data.moved)
+            .replace("{review}", reviewCount);
+        if (data.truncated) {
+            doneMessage += " La revision se ha limitado; vuelve a ejecutar el barrido.";
+        }
+        showStatus(doneMessage);
+        const reportRows = [
+            ...(Array.isArray(data.items) ? data.items.map(item => ({
+                ...item,
+                status: "move",
+                current_path: item.source,
+                would_move_to: item.destination,
+            })) : []),
+            ...(Array.isArray(data.review) ? data.review : []),
+            ...(Array.isArray(data.skipped) ? data.skipped : []),
+        ];
+        if (reportRows.length > 0) {
+            showSimulateResults({ simulated: reportRows, mode: "organize" });
+        }
+        await refreshCleanupSuggestions();
         await refreshStatus();
         await loadTree();
         if (currentPath !== null) await renderContent();
@@ -1124,7 +1268,7 @@ if (simulateBtn) {
     });
 }
 
-function showSimulateResults(data) {
+function showSimulateResultsLegacy(data) {
     const modal = document.getElementById("simulate-modal");
     const container = document.getElementById("simulate-results-body");
     const closeBtnHeader = document.getElementById("btn-close-simulate");
@@ -1133,17 +1277,134 @@ function showSimulateResults(data) {
     if (!modal || !container) return;
 
     const moves = Array.isArray(data) ? data : (data.simulated || []);
+    const previewWasTruncated = moves.some(item => item.status === "truncated");
+    const previewRows = moves.filter(item => item.status !== "truncated");
+    // Una carpeta de Descargas puede contener miles de archivos. Pintarlos
+    // todos en un dialogo crea miles de nodos DOM y deja QWebEngine en "No
+    // responde" aunque el servidor haya terminado correctamente.
+    const maxPreviewRows = 250;
 
-    if (!moves || moves.length === 0) {
+    if (!previewRows || previewRows.length === 0) {
         container.innerHTML = `<div class="empty-state-card" style="padding: 30px;"><div class="empty-icon-badge">${svgIcon("folder")}</div><h3>${t("simulate_no_changes")}</h3><p>${t("simulate_modal_hint")}</p></div>`;
     } else {
-        container.innerHTML = moves.map(item => `
-            <div class="simulate-item">
+        container.innerHTML = previewRows.slice(0, maxPreviewRows).map(item => `
+            <div class="simulation-row ${item.status === "review" ? "review" : ""}">
                 <span class="simulate-file">📄 ${escapeHtml(item.filename || item.file)}</span>
-                <span class="simulate-target">➔ ${escapeHtml(item.would_move_to || item.destination)}</span>
+                <span aria-hidden="true">→</span>
+                <span class="simulate-target">${escapeHtml(item.would_move_to || item.destination || "Se queda para revisión")}</span>
             </div>
         `).join("");
+        if (previewWasTruncated || previewRows.length > maxPreviewRows) {
+            const notice = document.createElement("p");
+            notice.className = "hint simulation-limit-notice";
+            const shown = Math.min(maxPreviewRows, previewRows.length);
+            notice.textContent = previewWasTruncated
+                ? `Vista previa parcial: se muestran ${shown} resultados. Organizar ahora no usa este limite.`
+                : `Se muestran ${shown} de ${previewRows.length} resultados para mantener la app fluida.`;
+            container.prepend(notice);
+        }
     }
+
+    if (closeBtnHeader) closeBtnHeader.onclick = () => modal.close();
+    if (closeBtnFooter) closeBtnFooter.onclick = () => modal.close();
+    modal.showModal();
+}
+
+// The preview is paginated so the full server report remains available without
+// creating thousands of DOM nodes at once.
+function renderSimulationPage() {
+    const container = document.getElementById("simulate-results-body");
+    const pagination = document.getElementById("simulate-pagination");
+    const prevBtn = document.getElementById("btn-simulate-prev");
+    const nextBtn = document.getElementById("btn-simulate-next");
+    const pageLabel = document.getElementById("simulate-page-label");
+    if (!container) return;
+
+    const counts = simulationRows.reduce((acc, item) => {
+        const key = item.status || "skipped";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+    const totalPages = Math.max(1, Math.ceil(simulationRows.length / SIMULATION_PAGE_SIZE));
+    simulationPage = Math.min(simulationPage, totalPages - 1);
+    const start = simulationPage * SIMULATION_PAGE_SIZE;
+    const pageRows = simulationRows.slice(start, start + SIMULATION_PAGE_SIZE);
+
+    const summary = document.createElement("div");
+    summary.className = "simulation-summary";
+    summary.textContent = `${simulationRows.length} elementos · ${counts.move || 0} se moverian · ${counts.review || 0} para revision · ${(counts.skipped || 0) + (counts.already_there || 0)} sin mover`;
+
+    if (simulationRows.length === 0) {
+        container.replaceChildren(summary);
+        const empty = document.createElement("div");
+        empty.className = "empty-state-card";
+        empty.style.padding = "30px";
+        empty.innerHTML = `<div class="empty-icon-badge">${svgIcon("folder")}</div><h3>${t("simulate_no_changes")}</h3><p>${t("simulate_modal_hint")}</p>`;
+        container.appendChild(empty);
+    } else {
+        const list = document.createElement("div");
+        list.innerHTML = pageRows.map(item => {
+            const isReview = item.status === "review";
+            const isSkipped = item.status === "skipped" || item.status === "already_there";
+            const target = isReview
+                ? "Se queda para revision"
+                : isSkipped
+                    ? (item.reason || "No se mueve")
+                    : (item.would_move_to || item.destination || "Sin destino");
+            const rowClass = isReview ? "review" : (isSkipped ? "skipped" : "");
+            return `
+                <div class="simulation-row ${rowClass}">
+                    <span class="simulate-file">📄 ${escapeHtml(item.filename || item.file)}</span>
+                    <span aria-hidden="true">→</span>
+                    <span class="simulate-target">${escapeHtml(target)}</span>
+                </div>
+            `;
+        }).join("");
+        container.replaceChildren(summary, list);
+    }
+
+    if (pagination) pagination.hidden = totalPages <= 1;
+    if (prevBtn) {
+        prevBtn.disabled = simulationPage === 0;
+        prevBtn.onclick = () => {
+            if (simulationPage > 0) {
+                simulationPage -= 1;
+                renderSimulationPage();
+            }
+        };
+    }
+    if (nextBtn) {
+        nextBtn.disabled = simulationPage >= totalPages - 1;
+        nextBtn.onclick = () => {
+            if (simulationPage < totalPages - 1) {
+                simulationPage += 1;
+                renderSimulationPage();
+            }
+        };
+    }
+    if (pageLabel) {
+        const first = simulationRows.length ? start + 1 : 0;
+        const last = Math.min(start + SIMULATION_PAGE_SIZE, simulationRows.length);
+        pageLabel.textContent = `Pagina ${simulationPage + 1} de ${totalPages} · ${first}-${last}`;
+    }
+}
+
+function showSimulateResults(data) {
+    const modal = document.getElementById("simulate-modal");
+    const closeBtnHeader = document.getElementById("btn-close-simulate");
+    const closeBtnFooter = document.getElementById("btn-close-simulate-footer");
+    if (!modal) return;
+
+    const rows = Array.isArray(data) ? data : (data.simulated || []);
+    const title = modal.querySelector("h2");
+    if (title) {
+        title.textContent = !Array.isArray(data) && data.mode === "organize"
+            ? t("organize_report_title", "Resultado de la organizacion")
+            : t("simulate_modal_title");
+    }
+    simulationRows = rows.filter(item => item.status !== "truncated");
+    simulationPage = 0;
+    renderSimulationPage();
 
     if (closeBtnHeader) closeBtnHeader.onclick = () => modal.close();
     if (closeBtnFooter) closeBtnFooter.onclick = () => modal.close();
@@ -1527,11 +1788,13 @@ async function refreshHistory() {
 
 const generalSettingsForm = document.getElementById("general-settings-form");
 const duplicateActionSelect = document.getElementById("duplicate-action-select");
+const cleanupModeSelect = document.getElementById("cleanup-mode-select");
 
 async function refreshGeneralSettings() {
     try {
         const settings = await fetchJSON("/api/settings");
         duplicateActionSelect.value = settings.duplicate_action || "suffix";
+        if (cleanupModeSelect) cleanupModeSelect.value = settings.cleanup_mode || "notify";
     } catch (err) {
         console.error("Error loading general settings:", err);
     }
@@ -1541,11 +1804,12 @@ if (generalSettingsForm) {
     generalSettingsForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const duplicate_action = duplicateActionSelect.value;
+        const cleanup_mode = cleanupModeSelect ? cleanupModeSelect.value : "notify";
         try {
             await fetchJSON("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ duplicate_action })
+                body: JSON.stringify({ duplicate_action, cleanup_mode })
             });
             showStatus(t("status_settings_saved"));
         } catch (err) {
@@ -1568,6 +1832,7 @@ async function refreshAiSettings() {
         aiUrlInput.value = status.url || aiUrlInput.value;
         aiModelInput.value = status.model || aiModelInput.value;
         aiStatusBadge.className = "status-pill " + (status.enabled ? "active" : "inactive");
+        aiStatusBadge.title = status.reason || "";
         aiStatusText.textContent = status.enabled ? t("ai_status_enabled") : t("ai_status_disabled");
     } catch (err) {
         console.error("Error loading AI settings:", err);
@@ -1742,8 +2007,8 @@ if (watchedForm) {
 // ---- estadísticas (statistics dashboard) ------------------------------------
 
 const CHART_COLORS = [
-    "#4c6bf5", "#7c4dff", "#00bcd4", "#4caf50", "#ff9800",
-    "#e91e63", "#009688", "#ff5722", "#3f51b5", "#8bc34a"
+    "#77736c", "#918a7d", "#6e746f", "#9b8f7a", "#8a7770",
+    "#7c8277", "#a09384", "#6b6e69", "#958d82", "#737975"
 ];
 
 async function refreshStatistics() {
@@ -2270,11 +2535,11 @@ async function runDiskAnalyzerScan() {
     if (diskAnalyzerExtBody) diskAnalyzerExtBody.innerHTML = `<tr><td colspan="4" class="disk-analyzer-empty-cell">${t("disk_analyzer_scanning_ext")}</td></tr>`;
 
     try {
-        const res = await fetch("/api/disk/scan", {
+        const res = await fetch("/api/disk/scan", withToken({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ path: scanPath })
-        });
+        }));
 
         if (!res.ok) {
             const err = await res.json();
@@ -2423,19 +2688,19 @@ function renderDiskAnalyzerTreemap() {
     if (items.length === 0) return;
 
     const categoryColors = [
-        "#2563eb", "#3b82f6", "#0284c7", "#10b981", "#8b5cf6",
-        "#ec4899", "#f59e0b", "#06b6d4", "#64748b", "#e11d48"
+        "#77736c", "#918a7d", "#6e746f", "#9b8f7a", "#8a7770",
+        "#7c8277", "#a09384", "#6b6e69", "#958d82", "#737975"
     ];
 
     function getTileColor(item, index) {
-        if (item.color && item.color !== "#94a3b8") return item.color;
+        if (item.color && item.color !== "#8d8b85" && item.color !== "#94a3b8") return item.color;
         if (item.is_dir) return categoryColors[index % categoryColors.length];
         
         const ext = (item.extension || item.name.split(".").pop() || "").toLowerCase().replace(/^\./, "");
         if (ext) {
             let hash = 0;
             for (let i = 0; i < ext.length; i++) hash = (hash * 47 + ext.charCodeAt(i)) % 360;
-            return `hsl(${hash}, 65%, 55%)`;
+            return `hsl(${hash}, 26%, 58%)`;
         }
         return categoryColors[index % categoryColors.length];
     }
@@ -2573,11 +2838,11 @@ if (btnDiskAnalyzerDelete) {
 
         try {
             const deletedName = diskAnalyzerSelectedItem.name;
-            const postDelete = async (confirm) => await fetch("/api/disk/delete", {
+            const postDelete = async (confirm) => await fetch("/api/disk/delete", withToken({
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ path: targetPath, confirm })
-            });
+            }));
 
             let res = await postDelete(false);
 
@@ -2593,7 +2858,7 @@ if (btnDiskAnalyzerDelete) {
             }
 
             if (res.ok) {
-                showStatusMessage(`${t("status_moved_to_trash")}: ${deletedName}`);
+                showStatus(`${t("status_moved_to_trash")}: ${deletedName}`);
                 diskAnalyzerSelectedItem = null;
                 btnDiskAnalyzerDelete.disabled = true;
                 if (diskAnalyzerFooterInfo) diskAnalyzerFooterInfo.textContent = t("disk_analyzer_no_selection");
@@ -2650,10 +2915,10 @@ if (btnUpdateCheck) {
     btnUpdateCheck.addEventListener("click", async () => {
         if (confirm(t("update_confirm_dialog"))) {
             try {
-                showStatusMessage(t("status_updating"));
-                const res = await fetch("/api/update/apply", { method: "POST", headers: { "Content-Type": "application/json" } });
+                showStatus(t("status_updating"));
+                const res = await fetch("/api/update/apply", withToken({ method: "POST", headers: { "Content-Type": "application/json" } }));
                 if (res.ok) {
-                    showStatusMessage(t("status_updating"));
+                    showStatus(t("status_updating"));
                     setTimeout(() => { location.reload(); }, 4000);
                 }
             } catch (e) {
@@ -2681,11 +2946,12 @@ async function init() {
         }
     } catch (e) {}
 
-    await Promise.all([refreshStatus(), loadTree(), refreshTopics(), refreshRules(), refreshGeneralSettings(), refreshMaintenance(), refreshWatchedFolders()]);
+    await Promise.all([refreshStatus(), refreshCleanupSuggestions(), loadTree(), refreshTopics(), refreshRules(), refreshGeneralSettings(), refreshMaintenance(), refreshWatchedFolders()]);
     renderBreadcrumbs();
     await renderContent();
     checkAppUpdates();
     setInterval(refreshStatus, 5000);
+    setInterval(refreshCleanupSuggestions, 15000);
     setInterval(checkAppUpdates, 60000);
 
     if (!isAlreadyOnboarded) {

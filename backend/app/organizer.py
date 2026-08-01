@@ -36,6 +36,11 @@ from config.settings import DOWNLOADS_DIR, HOME_DIR, IGNORED_SUFFIXES, is_tempor
 logger = logging.getLogger("martix.organizer")
 
 
+def _portable_path(path: Path) -> str:
+    """Use slash-separated paths in JSON responses on every platform."""
+    return str(path).replace("\\", "/")
+
+
 def calculate_sha256(path: Path) -> str:
     h = hashlib.sha256()
     try:
@@ -543,15 +548,21 @@ def format_rename_pattern(pattern: str, path: Path, category: str, topic_name: s
     return new_name
 
 
-def resolve_destination_folder(path: Path, rules: list[dict] | None = None) -> tuple[str, str, str | None]:
+def resolve_destination_folder(
+    path: Path,
+    rules: list[dict] | None = None,
+    topics: list[dict] | None = None,
+) -> tuple[str, str, str | None]:
     """Devuelve (categoria, carpeta_relativa_a_home, rename_pattern) para un archivo dado.
 
-    'rules' permite reutilizar las reglas ya leidas durante un barrido completo
-    en vez de consultar la base de datos una vez por archivo.
+    'rules' y 'topics' permiten reutilizar los datos ya leidos durante un
+    barrido completo en vez de consultar SQLite una vez por archivo.
     """
     ext = path.suffix.lower().lstrip(".")
     if rules is None:
         rules = db.list_rules()
+    if topics is None:
+        topics = db.list_topics()
 
     # Una sola cache de datos costosos para todas las reglas del archivo.
     facts = FileFacts(path, ext)
@@ -566,7 +577,7 @@ def resolve_destination_folder(path: Path, rules: list[dict] | None = None) -> t
             return "regla personalizada", rule["destination"], rule.get("rename_pattern")
 
     # Clasificar con el categorizador inteligente
-    result = classify(path)
+    result = classify(path, topics=topics)
     return result["category"], result["folder"], result.get("rename_pattern")
 
 
@@ -576,6 +587,219 @@ def resolve_destination_folder(path: Path, rules: list[dict] | None = None) -> t
 # podrian ver el mismo destino como libre a la vez (check-then-act) y uno
 # pisaria silenciosamente el archivo del otro con shutil.move.
 _move_lock = threading.Lock()
+
+
+# Files that are usually only useful during installation are never removed by
+# default.  They become a review suggestion after they have been filed.  The
+# explicit name check avoids treating every portable .exe as disposable.
+_INSTALLER_EXTENSIONS = frozenset({
+    "msi", "msix", "appx", "msu", "cab", "deb", "rpm", "appimage", "dmg", "pkg", "apk",
+})
+_INSTALLER_NAME_RE = re.compile(
+    r"(?:^|[ _.-])(setup|install(?:er)?|update|upgrade|driver|runtime|redistributable)(?:$|[ _.-])",
+    re.IGNORECASE,
+)
+
+
+def cleanup_reason_for(path: Path) -> str | None:
+    """Return a human-readable cleanup hint for high-confidence candidates."""
+    ext = path.suffix.lower().lstrip(".")
+    if ext in _INSTALLER_EXTENSIONS:
+        return "Parece un instalador; puedes eliminarlo cuando termines de instalarlo."
+    if ext == "exe" and _INSTALLER_NAME_RE.search(path.stem):
+        return "Parece un instalador de Windows; puedes eliminarlo cuando termines de instalarlo."
+    return None
+
+
+def _cleanup_mode() -> str:
+    mode = str(db.get_setting("cleanup_mode", "notify") or "notify").lower()
+    return mode if mode in {"notify", "direct"} else "notify"
+
+
+def _register_cleanup_candidate(path: Path, category: str) -> dict | None:
+    """Suggest or safely trash a cleanup candidate after a successful move."""
+    reason = cleanup_reason_for(path)
+    if not reason or not path.exists() or is_protected_path(path):
+        return None
+
+    suggestion = db.add_cleanup_suggestion(str(path), reason, category=category)
+    if _cleanup_mode() != "direct":
+        return {**suggestion, "action": "notify"}
+
+    # Direct mode is an explicit user preference, but even then deletion is
+    # recoverable: send the item to the native trash/quarantine, never unlink.
+    try:
+        outcome = trash.move_to_trash(path)
+    except OSError as exc:
+        logger.warning("no se pudo retirar automaticamente %s: %s", path, exc)
+        return {**suggestion, "action": "notify", "error": str(exc)}
+
+    resolved = db.resolve_cleanup_suggestion(int(suggestion["id"]), "deleted")
+    return {
+        **(resolved or suggestion),
+        "action": "deleted",
+        "trash_method": outcome["method"],
+        "trash_id": outcome["entry_id"],
+    }
+
+
+def _iter_folder_files(root: Path, max_files: int | None = None) -> list[Path]:
+    """Collect real files from a downloaded folder without following links.
+
+    ``max_files`` is optional and is only used by callers that explicitly want
+    a bounded preview. The real organizer does not silently stop at an
+    arbitrary per-folder limit.
+    """
+    files: list[Path] = []
+    try:
+        for current, dirs, names in os.walk(root, topdown=True, followlinks=False):
+            current_path = Path(current)
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".")
+                and not (current_path / d).is_symlink()
+                and not is_destination_or_reserved_dir(current_path / d)
+            ]
+            for name in sorted(names, key=str.lower):
+                if name.startswith("."):
+                    continue
+                candidate = current_path / name
+                if candidate.is_symlink() or not candidate.is_file():
+                    continue
+                files.append(candidate)
+                if max_files is not None and len(files) >= max_files:
+                    logger.warning("se alcanzo el limite de archivos al explorar %s", root)
+                    return files
+    except OSError as exc:
+        logger.warning("no se pudo explorar %s: %s", root, exc)
+    return files
+
+
+def _iter_directory_file_candidates(
+    directory: Path,
+    max_files: int | None = None,
+) -> tuple[list[Path], list[Path], bool]:
+    """Return files to inspect, source folders, and whether a preview was cut.
+
+    Destination folders are deliberately excluded so a second click cannot
+    pull already-organized files back into another category. Downloaded
+    folders are flattened only for inspection; their individual files still
+    receive their own classification.
+    """
+    candidates: list[Path] = []
+    source_dirs: list[Path] = []
+    truncated = False
+    try:
+        entries = sorted(directory.iterdir(), key=lambda p: p.name.lower())
+    except OSError as exc:
+        logger.warning("no se pudo listar %s: %s", directory, exc)
+        return candidates, source_dirs, False
+
+    for entry in entries:
+        if entry.name.startswith(".") or entry.is_symlink():
+            continue
+        if max_files is not None and len(candidates) >= max_files:
+            truncated = True
+            break
+        if entry.is_file():
+            candidates.append(entry)
+            continue
+        if not entry.is_dir() or is_destination_or_reserved_dir(entry):
+            continue
+
+        source_dirs.append(entry)
+        remaining = None if max_files is None else max_files - len(candidates)
+        nested = _iter_folder_files(entry, max_files=remaining)
+        candidates.extend(nested)
+        if remaining is not None and len(nested) >= remaining:
+            truncated = True
+            break
+
+    return candidates, source_dirs, truncated
+
+
+def _plan_skip(path: Path, reason: str, category: str = "skip") -> dict:
+    return {
+        "filename": path.name,
+        "current_path": str(path),
+        "would_move_to": None,
+        "category": category,
+        "status": "skipped",
+        "reason": reason,
+    }
+
+
+def _build_file_plan(
+    path: Path,
+    rules: list[dict],
+    topics: list[dict] | None = None,
+) -> dict:
+    """Classify one candidate without mutating the filesystem.
+
+    The returned private planning fields are consumed by ``organize_file`` so
+    the real run executes the same decision that the simulation displayed.
+    """
+    if is_temporary_download_file(path):
+        return _plan_skip(path, "Descarga temporal o incompleta; se espera a que termine.", "temporary")
+    if is_protected_path(path):
+        return _plan_skip(path, "Ruta protegida; no se toca.", "protected")
+    try:
+        if path.stat().st_size == 0:
+            return _plan_skip(path, "Archivo vacio; no se clasifica.", "empty")
+    except OSError:
+        return _plan_skip(path, "No se pudo leer el archivo.", "unreadable")
+    if is_file_in_use(path):
+        return _plan_skip(path, "El archivo esta en uso por otra aplicacion.", "in_use")
+
+    category, relative_folder, rename_pattern = resolve_destination_folder(
+        path, rules=rules, topics=topics
+    )
+    dest_dir = safe_destination_dir(relative_folder) if relative_folder else None
+    if dest_dir is None:
+        return {
+            "filename": path.name,
+            "current_path": str(path),
+            "would_move_to": None,
+            "category": category,
+            "status": "review",
+            "reason": "No hay una categoria fiable; se deja en su carpeta actual.",
+            "relative_folder": relative_folder,
+            "rename_pattern": rename_pattern,
+        }
+
+    topic_name = category.split(": ", 1)[1] if category.startswith("tema: ") else None
+    filename = format_rename_pattern(rename_pattern, path, category, topic_name) if rename_pattern else path.name
+    destination = dest_dir / filename
+    status = "already_there" if destination.parent.resolve() == path.parent.resolve() else "move"
+    return {
+        "filename": path.name,
+        "current_path": str(path),
+        "would_move_to": str(destination),
+        "category": category,
+        "status": status,
+        "cleanup_reason": cleanup_reason_for(destination),
+        "relative_folder": relative_folder,
+        "rename_pattern": rename_pattern,
+    }
+
+
+def _remove_empty_source_dirs(root: Path) -> None:
+    """Remove only empty directories created by a download, never data."""
+    if not root.exists() or not root.is_dir() or root.is_symlink():
+        return
+    try:
+        for current, dirs, _files in os.walk(root, topdown=False):
+            current_path = Path(current)
+            if current_path == root or is_protected_path(current_path):
+                continue
+            try:
+                current_path.rmdir()
+            except OSError:
+                pass
+        if not any(root.iterdir()) and not is_protected_path(root):
+            root.rmdir()
+    except OSError:
+        pass
 
 
 def _unique_destination(dest_dir: Path, filename: str) -> Path:
@@ -618,8 +842,19 @@ def is_destination_or_reserved_dir(path: Path) -> bool:
     return False
 
 
-def organize_folder(path: Path, rules: list[dict] | None = None) -> dict | None:
-    """Mueve una carpeta completa a su destino según reglas o clasificación."""
+def organize_folder(
+    path: Path,
+    rules: list[dict] | None = None,
+    topics: list[dict] | None = None,
+) -> dict | None:
+    """Organiza el contenido de una carpeta descargada archivo a archivo.
+
+    Las carpetas descargadas suelen mezclar PDFs, imágenes, instaladores y
+    subcarpetas. Moverlas como una sola unidad hacia ``Other`` solo cambia el
+    sitio del desorden, así que ahora cada hijo obtiene su propio destino. Las
+    carpetas vacías que quedan después se eliminan; las que aún contienen
+    archivos desconocidos se conservan para que el usuario pueda revisarlas.
+    """
     if not path.exists() or not path.is_dir():
         return None
 
@@ -634,71 +869,57 @@ def organize_folder(path: Path, rules: list[dict] | None = None) -> dict | None:
     if is_file_in_use(path):
         return None
 
-    category, relative_folder, rename_pattern = resolve_destination_folder(path, rules=rules)
-    dest_dir = safe_destination_dir(relative_folder)
-    if dest_dir is None:
-        logger.warning("destino invalido %r para carpeta %s; no se mueve", relative_folder, path.name)
+    files = _iter_folder_files(path)
+    if not files:
         return None
 
-    dest_resolved = dest_dir.resolve()
-    path_resolved = path.resolve()
-    if dest_resolved in (path.parent.resolve(), path_resolved):
+    moved: list[dict] = []
+    for child in files:
+        if not child.exists() or is_file_in_use(child):
+            continue
+        result = organize_file(child, rules=rules, topics=topics)
+        if result:
+            moved.append(result)
+
+    _remove_empty_source_dirs(path)
+    if not moved:
         return None
-    # Mover una carpeta dentro de si misma la destruiria (o fallaria a medias
-    # dejando el contenido partido).
-    if path_resolved in dest_resolved.parents:
-        logger.warning(
-            "destino %s esta dentro de la carpeta %s; no se mueve", dest_resolved, path_resolved
-        )
-        return None
 
-    topic_name = category.split(": ", 1)[1] if category.startswith("tema: ") else None
-    if rename_pattern:
-        dest_filename = format_rename_pattern(rename_pattern, path, category, topic_name)
-    else:
-        dest_filename = path.name
-
-    with _move_lock:
-        destination = _unique_destination(dest_dir, dest_filename)
-        if destination.resolve() == path.resolve():
-            return None
-
-        try:
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            source_str = str(path)
-            shutil.move(source_str, str(destination))
-        except OSError as exc:
-            logger.error("no se pudo mover carpeta %s: %s", path.name, exc)
-            return None
-
-    db.log_move(
-        filename=path.name,
-        source=source_str,
-        destination=str(destination),
-        category=category,
-    )
+    first = moved[0]
+    first_destination = Path(first["destination"])
     return {
         "filename": path.name,
-        "source": source_str,
-        "destination": str(destination),
-        "category": category,
+        "source": str(path),
+        # Compatibilidad con callers que esperaban un movimiento de carpeta;
+        # las operaciones reales quedan disponibles en ``items``.
+        "destination": _portable_path(first_destination.parent),
+        "category": first.get("category", "carpeta organizada"),
         "is_dir": True,
+        "items": moved,
+        "items_moved": len(moved),
+        "items_review": max(0, len(files) - len(moved)),
     }
 
 
-def organize_file(path: Path, rules: list[dict] | None = None) -> dict | None:
+def organize_file(
+    path: Path,
+    rules: list[dict] | None = None,
+    planned: dict | None = None,
+    topics: list[dict] | None = None,
+) -> dict | None:
     """Mueve un archivo o carpeta a su ubicación correspondiente. Devuelve info del
     movimiento, o None si no se movio (ya no existe, destino invalido,
     o ya esta en su carpeta de destino).
 
     'rules' evita releer las reglas de la base de datos en cada archivo cuando
-    se organiza un directorio entero.
+    se organiza un directorio entero. 'planned' permite ejecutar exactamente
+    la decision que ya tomo la simulacion o el informe del barrido.
     """
     if not path.exists():
         return None
 
     if path.is_dir():
-        return organize_folder(path, rules=rules)
+        return organize_folder(path, rules=rules, topics=topics)
 
     # Un enlace simbolico se moveria a si mismo dejando el enlace roto, o
     # peor: apuntando fuera de la carpeta personal.
@@ -757,7 +978,20 @@ def organize_file(path: Path, rules: list[dict] | None = None) -> dict | None:
                 except OSError:
                     logger.debug("no se pudo limpiar %s tras un desempaquetado fallido", extract_dir)
 
-    category, relative_folder, rename_pattern = resolve_destination_folder(path, rules=rules)
+    if planned is None:
+        category, relative_folder, rename_pattern = resolve_destination_folder(
+            path, rules=rules, topics=topics
+        )
+    else:
+        category = planned.get("category", "review")
+        relative_folder = planned.get("relative_folder")
+        rename_pattern = planned.get("rename_pattern")
+
+    # Unknown extensions intentionally remain in their source folder.  A
+    # generic destination would only hide the item in an "Other" dump.
+    if not relative_folder:
+        logger.info("se deja para revision (%s): %s", category, path.name)
+        return None
 
     dest_dir = safe_destination_dir(relative_folder)
     if dest_dir is None:
@@ -816,53 +1050,100 @@ def organize_file(path: Path, rules: list[dict] | None = None) -> dict | None:
             logger.error("no se pudo mover %s: %s", path.name, exc)
             return None
 
+    cleanup = _register_cleanup_candidate(destination, category)
+
     db.log_move(
         filename=path.name,
         source=source_str,
         destination=str(destination),
         category=category,
+        undoable=not (cleanup and cleanup.get("action") == "deleted"),
     )
-    return {
+    result = {
         "filename": path.name,
-        "source": source_str,
-        "destination": str(destination),
+        "source": _portable_path(Path(source_str)),
+        "destination": _portable_path(destination),
         "category": category,
     }
+    if cleanup:
+        result["cleanup"] = cleanup
+    return result
+
+
+def organize_directory_report(directory: Path) -> dict:
+    """Planifica y ejecuta un barrido completo, devolviendo todos sus estados.
+
+    La simulacion y este barrido usan `_build_file_plan`. Asi, un archivo que
+    la vista previa marca como revision no puede acabar escondido en otra
+    carpeta durante la ejecucion real, y la interfaz puede explicar tambien
+    los archivos temporales, vacios o bloqueados.
+    """
+    report = {"items": [], "review": [], "skipped": [], "truncated": False}
+    if not directory.exists() or not directory.is_dir():
+        return report
+
+    rules = db.list_rules()
+    topics = db.list_topics()
+    candidates, source_dirs, truncated = _iter_directory_file_candidates(directory)
+    report["truncated"] = truncated
+
+    for path in candidates:
+        plan = _build_file_plan(path, rules, topics=topics)
+        status = plan.get("status")
+        if status == "review":
+            report["review"].append(plan)
+            continue
+        if status != "move":
+            report["skipped"].append(plan)
+            continue
+
+        result = organize_file(path, rules=rules, planned=plan, topics=topics)
+        if result:
+            report["items"].append(result)
+        else:
+            report["skipped"].append({
+                **plan,
+                "status": "skipped",
+                "reason": "No se pudo mover despues de preparar el plan.",
+            })
+
+    for source_dir in source_dirs:
+        _remove_empty_source_dirs(source_dir)
+
+    return report
 
 
 def organize_directory(directory: Path) -> list[dict]:
-    """Organiza de golpe todos los archivos y carpetas ya existentes en un directorio
-    (usado por 'Organizar Ahora')."""
-    moved = []
-    if not directory.exists():
-        return moved
+    """Compatibilidad: ejecuta un barrido y devuelve solo los movimientos."""
+    return organize_directory_report(directory)["items"]
 
-    # Se leen las reglas UNA vez por barrido. Antes se consultaba la base de
-    # datos (abriendo una conexion nueva) por cada archivo, que era el cuello
-    # de botella al organizar carpetas grandes.
+
+def simulate_directory(directory: Path, max_files: int | None = None) -> list[dict]:
+    """Build the complete non-mutating plan used by the preview dialog.
+
+    The optional limit is explicit for callers that need a bounded probe. The
+    normal API passes no limit, so the user receives every move, review and
+    skipped item instead of a silent first-page slice.
+    """
+    if not directory.exists() or not directory.is_dir():
+        return []
+
     rules = db.list_rules()
-
-    for entry in sorted(directory.iterdir()):
-        if entry.name.startswith(".") or entry.is_symlink():
-            continue
-        if entry.is_file():
-            if is_temporary_download_file(entry) or is_file_in_use(entry):
-                continue
-            try:
-                if entry.stat().st_size == 0:
-                    continue
-            except OSError:
-                continue
-            result = organize_file(entry, rules=rules)
-            if result:
-                moved.append(result)
-        elif entry.is_dir():
-            if is_destination_or_reserved_dir(entry) or is_file_in_use(entry):
-                continue
-            result = organize_folder(entry, rules=rules)
-            if result:
-                moved.append(result)
-    return moved
+    topics = db.list_topics()
+    candidates, _source_dirs, truncated = _iter_directory_file_candidates(
+        directory, max_files=max_files
+    )
+    plan = [_build_file_plan(path, rules, topics=topics) for path in candidates]
+    if truncated:
+        plan.append({
+            "filename": "Vista previa limitada",
+            "current_path": str(directory),
+            "would_move_to": None,
+            "category": "preview",
+            "status": "truncated",
+            "reason": "La vista previa alcanzo el limite solicitado.",
+        })
+    return plan
 
 
 def undo_move(move_id: int) -> tuple[dict | None, str | None]:

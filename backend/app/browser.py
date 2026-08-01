@@ -84,6 +84,11 @@ def build_tree() -> list[dict]:
     }]
 
     for cat_key, cat in categories.items():
+        # "other" is intentionally a review bucket without a destination.
+        # Showing it as a real folder would invite the organizer to hide
+        # unknown files there again.
+        if not cat.get("folder"):
+            continue
         tree.append({
             "key": cat_key,
             "label": cat.get("label", cat_key.capitalize()),

@@ -1,5 +1,6 @@
-# Opcional: ventana de escritorio nativa para desktop.py.
-# Si no se instala, desktop.py usa el modo app de Chrome/Chromium/Edge.
-pywebview>=5.0,<7.0
+# Ventana nativa y motor embebido; el ejecutable no abre navegadores externos.
 PyQt6>=6.5.0
 PyQt6-WebEngine>=6.5.0
+
+# Generador del ejecutable autocontenido para Windows.
+pyinstaller>=6.0

@@ -72,6 +72,32 @@ Multiple rules per extension with combined `AND` conditions over file name, size
 
 ## Installation
 
+### Windows: aplicación de escritorio
+
+La distribución para usuarios no técnicos es `Martix.exe`. Al abrirlo se
+inicia una ventana nativa y la patrulla funciona en segundo plano desde la
+bandeja del sistema. No hay que abrir `localhost`, instalar Python ni usar
+Chrome/Edge. El ejecutable usa un puerto efímero de loopback únicamente como
+canal interno entre la ventana y el motor local; esa URL no se expone al
+usuario ni acepta conexiones de red.
+
+Para generar el ejecutable desde el código en Windows:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -r requirements-desktop.txt
+.venv\Scripts\python.exe build_desktop.py
+```
+
+El resultado queda directamente en `Martix.exe`, en la carpeta principal del
+proyecto. `backend\dist\Martix.exe` se conserva solo como copia técnica de
+PyInstaller. Para instalarlo con arranque opcional al iniciar sesión:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File backend\deploy\install_windows.ps1
+```
+
 ### Automatic Installation (Linux)
 
 ```bash
@@ -82,7 +108,7 @@ cd martix
 
 `install.sh` builds the virtual environment, installs dependencies, registers application shortcuts, configures autostart/systemd services, and installs the global `martix` CLI command. To clean uninstall: `./uninstall.sh`.
 
-### Manual Setup (Cross-Platform)
+### Manual Setup (Cross-Platform / desarrollo)
 
 ```bash
 git clone https://github.com/marcmarti9/martix.git
@@ -93,8 +119,10 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Access the web portal at <http://127.0.0.1:5000>. For a standalone desktop window without a browser tab:
-`python desktop.py`.
+For development, `python main.py` exposes the local web UI at
+<http://127.0.0.1:5000>. The desktop entry point is `python desktop.py`; it
+requires the desktop dependencies and opens only the native PyQt6 window (it
+does not fall back to an external browser).
 
 ### Optional Integrations
 
@@ -102,7 +130,7 @@ Access the web portal at <http://127.0.0.1:5000>. For a standalone desktop windo
 |---|---|
 | Image OCR Content Extraction | Tesseract OCR (`sudo apt install tesseract-ocr`) |
 | Local AI Classification | [Ollama](https://ollama.com) + `MARTIX_LLM=1` |
-| Native Desktop Window | `pip install -r requirements-desktop.txt` |
+| Native Desktop Window / Windows `.exe` | `pip install -r requirements-desktop.txt` |
 
 ---
 
@@ -112,7 +140,7 @@ Privacy in Martix is enforced directly by codebase constraints:
 
 - **Single Outbound Network Path:** The only permitted HTTP request across the entire repository is to a local LLM instance. Every outbound call validates that the target URL resolves strictly to a loopback address (`127.0.0.1` / `localhost`). Setting `MARTIX_LLM_URL` to a remote host causes Martix to reject the request and log a warning.
 - **Local Host Binding:** Server binds strictly to `127.0.0.1`. Binding to external interfaces requires setting an explicit `MARTIX_TOKEN`.
-- **Zero Telemetry:** No analytics, tracking code, or user accounts.
+- **Zero Telemetry:** No analytics, tracking code, user accounts, automatic update checks, or runtime Git/network calls.
 - **Isolated Frontend Assets:** Interface assets are self-contained with no external CDN or remote font dependencies, enforced by a restrictive Content-Security-Policy (CSP).
 
 Detailed threat models and security bounds are available in [docs/security.md](docs/security.md).

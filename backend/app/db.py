@@ -40,7 +40,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         conn.execute("PRAGMA journal_mode = WAL")
 
         required = {"rules", "moves_log", "settings", "topics",
-                    "maintenance_rules", "watched_folders"}
+                    "maintenance_rules", "watched_folders", "cleanup_suggestions"}
         existing = {
             row["name"]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -156,6 +156,24 @@ def _migrate(conn: sqlite3.Connection) -> None:
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
         """)
+
+    if "cleanup_suggestions" not in existing_tables:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS cleanup_suggestions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT NOT NULL UNIQUE,
+                filename TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'cleanup',
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                resolved_at TEXT
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cleanup_suggestions_status "
+            "ON cleanup_suggestions(status, created_at)"
+        )
 
 
 @contextmanager
@@ -354,6 +372,75 @@ def set_setting(key: str, value: str) -> None:
                ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
             (key, value),
         )
+
+
+# ---- sugerencias de limpieza -----------------------------------------------
+
+def add_cleanup_suggestion(path: str, reason: str, category: str = "cleanup") -> dict:
+    """Registra un posible residuo sin borrarlo.
+
+    La ruta se conserva para que la interfaz pueda pedir confirmacion sobre el
+    elemento exacto. Si el usuario ya lo descarto, no se vuelve a abrir la
+    misma sugerencia en cada barrido.
+    """
+    path = str(path)
+    filename = path.replace("\\", "/").rsplit("/", 1)[-1]
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO cleanup_suggestions (path, filename, reason, category)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(path) DO UPDATE SET
+                   filename = excluded.filename,
+                   reason = excluded.reason,
+                   category = excluded.category,
+                   status = CASE
+                       WHEN cleanup_suggestions.status = 'deleted' THEN 'deleted'
+                       ELSE cleanup_suggestions.status
+                   END""",
+            (path, filename, reason, category),
+        )
+        row = conn.execute(
+            "SELECT * FROM cleanup_suggestions WHERE path = ?", (path,)
+        ).fetchone()
+        return dict(row)
+
+
+def list_cleanup_suggestions(status: str | None = "pending", limit: int = 100) -> list[dict]:
+    limit = max(1, min(int(limit), 500))
+    with get_conn() as conn:
+        if status is None:
+            rows = conn.execute(
+                "SELECT * FROM cleanup_suggestions ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM cleanup_suggestions WHERE status = ? "
+                "ORDER BY id DESC LIMIT ?", (status, limit)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_cleanup_suggestion(suggestion_id: int) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM cleanup_suggestions WHERE id = ?", (int(suggestion_id),)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def resolve_cleanup_suggestion(suggestion_id: int, status: str) -> dict | None:
+    if status not in {"dismissed", "deleted", "missing"}:
+        raise ValueError("estado de sugerencia no valido")
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE cleanup_suggestions SET status = ?, resolved_at = datetime('now') "
+            "WHERE id = ?",
+            (status, int(suggestion_id)),
+        )
+        row = conn.execute(
+            "SELECT * FROM cleanup_suggestions WHERE id = ?", (int(suggestion_id),)
+        ).fetchone()
+        return dict(row) if row else None
 
 
 # ---- temas (topics) ----------------------------------------------------------

@@ -59,7 +59,99 @@ for _cat_name, _cat_data in _categories["categories"].items():
     for _ext in _cat_data["extensions"]:
         _EXT_TO_CATEGORY[_ext.lower()] = _cat_name
 
+# Descargas reales contienen muchos formatos que no caben en la lista corta
+# del fichero de configuracion: proyectos de R/Java, diagramas, archivos de
+# CAD, datos cientificos y paquetes de software. Si todos caen en ``other``,
+# la simulacion termina mostrando miles de revisiones aunque sean tipos
+# perfectamente reconocibles. Esta tabla es un segundo nivel de conocimiento
+# estable y conservador; no depende de una red ni de un modelo.
+_FALLBACK_EXT_TO_CATEGORY = {
+    # Imagenes y multimedia
+    "avif": "images", "jxl": "images", "ico": "images", "icns": "images",
+    "psd": "images", "xcf": "images", "dds": "images", "tga": "images",
+    "3gp": "videos", "3g2": "videos", "mts": "videos", "m2ts": "videos",
+    "mpeg": "videos", "mpg": "videos", "m2v": "videos", "ogv": "videos",
+    "rm": "videos", "rmvb": "videos", "aif": "music", "aiff": "music",
+    "amr": "music", "mid": "music", "midi": "music", "opus": "music",
+    "ra": "music", "mka": "music",
+
+    # Paquetes, librerias y formatos comprimidos
+    "iso": "compressed", "img": "compressed", "jar": "compressed",
+    "war": "compressed", "ear": "compressed", "pak": "compressed",
+    "whl": "compressed", "egg": "compressed", "xpi": "compressed",
+
+    # Codigo, notebooks, CAD y hardware
+    "r": "code", "rmd": "code", "rproj": "code", "jl": "code",
+    "lua": "code", "pl": "code", "pm": "code", "m": "code", "mm": "code",
+    "ipynb": "code", "asm": "code", "s": "code", "v": "code",
+    "vhd": "code", "vhdl": "code", "sv": "code", "svh": "code",
+    "tcl": "code", "ino": "code", "kicad_pcb": "code", "kicad_sch": "code",
+    "kicad_mod": "code", "kicad_wks": "code", "gbr": "code", "drl": "code",
+    "gradle": "code", "cmake": "code", "make": "code", "sln": "code",
+    "csproj": "code", "vcxproj": "code", "vsh": "code", "vwf": "code",
+    "vqm": "code", "bsf": "code", "bdf": "code", "kpt": "code",
+    "lpc": "code", "xslt": "code", "xsd": "code", "dll": "code",
+    "lib": "code", "so": "code", "dylib": "code",
+
+    # Documentos, notas, diagramas y configuracion legible
+    "md": "documents", "markdown": "documents", "rst": "documents",
+    "adoc": "documents", "drawio": "documents", "excalidraw": "documents",
+    "eml": "documents", "msg": "documents", "log": "documents",
+    "conf": "documents", "cfg": "documents", "ini": "documents",
+    "policy": "documents", "properties": "documents", "qmsg": "documents",
+    "rpt": "documents", "sci": "documents", "bpm": "documents",
+    "summary": "documents", "local": "documents",
+
+    # Datos y formatos de herramientas
+    "parquet": "data", "feather": "data", "pickle": "data", "pkl": "data",
+    "rds": "data", "sav": "data", "mat": "data", "h5": "data",
+    "hdf5": "data", "arff": "data", "dbf": "data", "mdb": "data",
+    "accdb": "data", "cdb": "data", "hdb": "data", "ddb": "data",
+    "rdb": "data", "ecobp": "data",
+    "logdb": "data", "cache": "data",
+
+    # Modelado y libros electronicos
+    "dwg": "documents", "dxf": "documents", "step": "documents",
+    "stp": "documents", "iges": "documents", "igs": "documents",
+    "stl": "documents", "blend": "documents", "cbz": "books", "cbr": "books",
+    "bin": "compressed", "dat": "data",
+}
+for _ext, _cat_name in _FALLBACK_EXT_TO_CATEGORY.items():
+    _EXT_TO_CATEGORY.setdefault(_ext, _cat_name)
+
+# Destinos mas utiles que la carpeta raiz de la categoria para formatos que
+# suelen mezclarse con miles de archivos tecnicos.
+_SPECIAL_EXTENSION_FOLDERS = {
+    "r": "Development/R", "rmd": "Development/R", "rproj": "Development/R",
+    "java": "Development/Java", "jar": "Archives/Java libraries",
+    "dll": "Development/Dependencies", "lib": "Development/Dependencies",
+    "so": "Development/Dependencies", "dylib": "Development/Dependencies",
+    "drawio": "Documents/Diagrams", "excalidraw": "Documents/Diagrams",
+    "md": "Documents/Notes", "markdown": "Documents/Notes",
+    "rst": "Documents/Notes", "adoc": "Documents/Notes",
+    "log": "Documents/Technical", "conf": "Documents/Technical",
+    "cfg": "Documents/Technical", "ini": "Documents/Technical",
+    "properties": "Development/Configuration", "xslt": "Development/XML",
+    "xsd": "Development/XML", "xml": "Development/XML",
+    "vhd": "Development/Hardware", "vhdl": "Development/Hardware",
+    "sv": "Development/Hardware", "svh": "Development/Hardware",
+    "kicad_pcb": "Development/Hardware", "kicad_sch": "Development/Hardware",
+    "kicad_mod": "Development/Hardware", "gbr": "Development/Hardware",
+    "drl": "Development/Hardware", "stl": "Documents/3D models",
+}
+
 _CONTENT_EXTENSIONS = set(_categories["topic_matching"]["content_extensions"])
+_CONTENT_EXTENSIONS.update({
+    "md", "markdown", "rst", "adoc", "rmd", "tex", "bib", "log", "conf",
+    "cfg", "ini", "properties", "policy", "qmsg", "rpt", "sci", "summary",
+    "local", "csv", "json", "xml", "yaml", "yml", "toml", "sql", "r",
+})
+_TEXT_CONTENT_EXTENSIONS = {
+    "txt", "md", "markdown", "rst", "adoc", "rmd", "tex", "bib", "log",
+    "conf", "cfg", "ini", "properties", "policy", "qmsg", "rpt", "sci",
+    "summary", "local", "csv", "json", "xml", "yaml", "yml", "toml", "sql",
+    "r",
+}
 if _OCR_AVAILABLE:
     _CONTENT_EXTENSIONS.update({"png", "jpg", "jpeg", "tiff", "bmp", "gif"})
 
@@ -250,7 +342,7 @@ def content_is_extractable(ext: str) -> bool:
     `content not_contains X` casaba con TODOS los binarios (mp4, xlsx, zip...)
     porque "" nunca contiene nada.
     """
-    if ext in ("pdf", "docx", "txt"):
+    if ext in ("pdf", "docx") or ext in _TEXT_CONTENT_EXTENSIONS:
         return True
     return ext in _OCR_EXTENSIONS and _OCR_AVAILABLE
 
@@ -260,7 +352,7 @@ def _extract_content(path: Path, ext: str) -> str:
         return _extract_pdf_text(path)
     if ext == "docx":
         return _extract_docx_text(path)
-    if ext == "txt":
+    if ext in _TEXT_CONTENT_EXTENSIONS:
         return _extract_txt_text(path)
     if ext in _OCR_EXTENSIONS:
         return _extract_image_text(path)
@@ -376,27 +468,75 @@ def classify_folder(path: Path) -> dict:
             category_folder = _categories["categories"][dominant_cat]["folder"]
             return {"category": dominant_cat, "topic": None, "folder": category_folder}
 
-    fallback_folder = _categories["categories"].get("other", {}).get("folder", "Other")
-    return {"category": "other", "topic": None, "folder": fallback_folder}
+    # A mixed or unknown folder is not a reason to dump its contents into a
+    # generic "Other" directory.  The organizer will inspect each child and
+    # leave anything it cannot classify in place for review.
+    return {
+        "category": "review",
+        "topic": None,
+        "folder": None,
+        "reason": "carpeta mixta o sin una categoria fiable",
+    }
 
 
-def classify(path: Path) -> dict:
+def _sniff_unknown_file(path: Path) -> str | None:
+    """Use a tiny local signature/text probe for files without a known suffix."""
+    try:
+        with open(path, "rb") as stream:
+            head = stream.read(4096)
+    except OSError:
+        return None
+
+    if head.startswith(b"%PDF"):
+        return "documents"
+    if head.startswith((b"\x89PNG", b"\xff\xd8\xff", b"GIF8", b"RIFF")):
+        return "images"
+    if head.startswith((b"PK\x03\x04", b"Rar!", b"7z\xbc\xaf\x27\x1c", b"\x1f\x8b")):
+        return "compressed"
+    if not head or b"\x00" in head:
+        return None
+
+    text = head.decode("utf-8", errors="ignore")
+    printable = sum(ch.isprintable() or ch in "\r\n\t" for ch in text)
+    if printable / max(1, len(text)) < 0.85:
+        return None
+
+    text_norm = normalize(f"{path.name} {text[:1000]}")
+    code_markers = (
+        " import ", " from ", " class ", " function ", " include ",
+        " public static ", " package ", " select ", " def ", " const ",
+        " interface ", " module ", " begin ", " end ",
+    )
+    return "code" if any(marker in f" {text_norm} " for marker in code_markers) else "documents"
+
+
+def classify(path: Path, topics: list[dict] | None = None) -> dict:
     """Devuelve {"category": str, "topic": str | None, "folder": str}
     donde 'folder' es la ruta relativa a la carpeta personal del usuario.
 
     Prioridad: Temas del usuario > subcategorias descriptivas por nombre >
     LLM local opcional (documentos) > carpeta base de la categoria."""
+    if topics is None:
+        topics = db.list_topics()
+
     if path.is_dir():
         return classify_folder(path)
 
     ext = path.suffix.lower().lstrip(".")
-    category = _EXT_TO_CATEGORY.get(ext, "other")
-    if category not in _categories["categories"]:
-        category = "other"
+    category = _EXT_TO_CATEGORY.get(ext)
+    if not category or category not in _categories["categories"]:
+        category = _sniff_unknown_file(path)
+        if not category or category not in _categories["categories"]:
+            return {
+                "category": "review",
+                "topic": None,
+                "folder": None,
+                "reason": "extension y contenido no reconocibles",
+            }
 
     content = ""
-    if ext in _CONTENT_EXTENSIONS:
-        topic, content = detect_topic(path, ext, db.list_topics())
+    if ext in _CONTENT_EXTENSIONS and topics:
+        topic, content = detect_topic(path, ext, topics)
         if topic:
             return {
                 "category": f"tema: {topic['name']}",
@@ -409,12 +549,14 @@ def classify(path: Path) -> dict:
     if sub:
         return {"category": sub["label"], "topic": None, "folder": sub["folder"]}
 
-    category_folder = _categories["categories"][category]["folder"]
+    special_folder = _SPECIAL_EXTENSION_FOLDERS.get(ext)
+    category_folder = special_folder or _categories["categories"][category]["folder"]
 
-    if ext in _CONTENT_EXTENSIONS and llm.LLM_ENABLED:
+    content_candidate = ext in _CONTENT_EXTENSIONS or (not ext and category == "documents")
+    if content_candidate and not special_folder and llm.is_enabled():
         if not content:
-            content = _extract_content(path, ext)
-        suggested = llm.suggest_subfolder(path.name, content, category_folder)
+            content = _extract_txt_text(path) if not ext else _extract_content(path, ext)
+        suggested = llm.suggest_subfolder(path.name, content, category_folder) if content.strip() else None
         if suggested:
             return {"category": f"IA local: {suggested.rsplit('/', 1)[-1]}", "topic": None, "folder": suggested}
 

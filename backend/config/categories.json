@@ -38,7 +38,31 @@
       "label": "Installers",
       "icon": "installer",
       "folder": "Installers",
-      "extensions": ["exe", "msi", "deb", "rpm", "appimage", "dmg", "pkg", "apk"]
+      "extensions": ["exe", "msi", "msix", "appx", "msu", "cab", "deb", "rpm", "appimage", "dmg", "pkg", "apk"]
+    },
+    "code": {
+      "label": "Development",
+      "icon": "code",
+      "folder": "Development",
+      "extensions": ["py", "js", "mjs", "cjs", "ts", "tsx", "jsx", "html", "htm", "css", "scss", "java", "kt", "kts", "c", "h", "cpp", "hpp", "cs", "go", "rs", "rb", "php", "swift", "dart", "sh", "ps1", "bat", "sql"]
+    },
+    "books": {
+      "label": "Books",
+      "icon": "book",
+      "folder": "Books",
+      "extensions": ["epub", "mobi", "azw", "azw3", "djvu"]
+    },
+    "fonts": {
+      "label": "Fonts",
+      "icon": "font",
+      "folder": "Documents/Fonts",
+      "extensions": ["ttf", "otf", "woff", "woff2"]
+    },
+    "data": {
+      "label": "Data",
+      "icon": "data",
+      "folder": "Documents/Data",
+      "extensions": ["json", "xml", "yaml", "yml", "toml", "sqlite", "sqlite3", "db"]
     },
     "documents": {
       "label": "Documents",
@@ -54,9 +78,9 @@
       ]
     },
     "other": {
-      "label": "Other",
+      "label": "Needs review",
       "icon": "other",
-      "folder": "Documents/Other",
+      "folder": null,
       "extensions": []
     }
   },

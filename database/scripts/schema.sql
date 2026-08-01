@@ -54,3 +54,20 @@ CREATE TABLE IF NOT EXISTS watched_folders (
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Possible cleanup candidates are suggestions, never silent deletions.  The
+-- path is kept so the user can review the exact item before sending it to the
+-- native trash; it is not a licence to delete anything permanently.
+CREATE TABLE IF NOT EXISTS cleanup_suggestions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL UNIQUE,
+    filename TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'cleanup',
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_cleanup_suggestions_status
+    ON cleanup_suggestions(status, created_at);

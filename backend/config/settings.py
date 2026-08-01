@@ -7,27 +7,39 @@ import os
 import sys
 from pathlib import Path
 
-if getattr(sys, "frozen", False):
-    BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
-    PROJECT_DIR = BASE_DIR
-    BACKEND_DIR = BASE_DIR / "backend" if (BASE_DIR / "backend").exists() else BASE_DIR
-    CONFIG_DIR = BASE_DIR / "config" if (BASE_DIR / "config").exists() else BASE_DIR
+
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    # PyInstaller extracts resources to a temporary directory.  It is valid for
+    # read-only assets, but it is deleted when the application exits, so user
+    # data must never be stored there.
+    RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    PROJECT_DIR = RESOURCE_DIR
+    BACKEND_DIR = RESOURCE_DIR / "backend" if (RESOURCE_DIR / "backend").exists() else RESOURCE_DIR
+    CONFIG_DIR = RESOURCE_DIR / "config" if (RESOURCE_DIR / "config").exists() else RESOURCE_DIR
 else:
     BACKEND_DIR = Path(__file__).resolve().parent.parent
     PROJECT_DIR = BACKEND_DIR.parent
+    RESOURCE_DIR = PROJECT_DIR
     CONFIG_DIR = Path(__file__).resolve().parent
 
-CATEGORIES_FILE = CONFIG_DIR / "categories.json"
+HOME_DIR = Path.home()
 
-DB_PATH = PROJECT_DIR / "database" / "martix.db"
-_OLD_DB_PATH = PROJECT_DIR / "database" / "sortix.db"
-if not DB_PATH.exists() and _OLD_DB_PATH.exists():
-    try:
-        _OLD_DB_PATH.rename(DB_PATH)
-    except Exception:
-        pass
 
-SCHEMA_PATH = PROJECT_DIR / "database" / "scripts" / "schema.sql"
+def _default_data_dir() -> Path:
+    """Carpeta persistente de Martix segun la plataforma.
+
+    En un ejecutable congelado no se puede usar ``_MEIPASS``: PyInstaller lo
+    limpia al cerrar y eso haria desaparecer la base de datos, la papelera y
+    las preferencias del usuario.
+    """
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or (HOME_DIR / "AppData" / "Local")
+        return Path(base) / "Martix"
+    if sys.platform == "darwin":
+        return HOME_DIR / "Library" / "Application Support" / "Martix"
+    base = os.environ.get("XDG_DATA_HOME") or (HOME_DIR / ".local" / "share")
+    return Path(base) / "martix"
 
 
 def _load_env(env_path: Path) -> dict:
@@ -44,35 +56,53 @@ def _load_env(env_path: Path) -> dict:
     return values
 
 
-_env = _load_env(BACKEND_DIR / ".env")
+# Process environment is useful for the packaged application, while the
+# project/data .env files keep the source workflow convenient.  A file value
+# deliberately wins over the process value, matching the previous behavior.
+_env = dict(os.environ)
+_env.update(_load_env(BACKEND_DIR / ".env"))
+_env.update(_load_env(_default_data_dir() / ".env"))
 
 HOST = _env.get("HOST", "127.0.0.1")
-PORT = int(_env.get("PORT", "5000"))
+
+
+def _env_int(name: str, default: int, minimum: int = 0) -> int:
+    try:
+        return max(minimum, int(_env.get(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+PORT = _env_int("PORT", 5000, minimum=0)
 
 _downloads_override = _env.get("DOWNLOADS_DIR", "").strip()
 DOWNLOADS_DIR = Path(_downloads_override).expanduser() if _downloads_override else Path.home() / "Downloads"
 
-HOME_DIR = Path.home()
 
-
-def _default_data_dir() -> Path:
-    """Carpeta de datos de Martix segun la convencion de cada plataforma.
-    Aqui vive la papelera propia (cuarentena) de los borrados."""
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA") or (HOME_DIR / "AppData" / "Local")
-        return Path(base) / "Martix"
-    if sys.platform == "darwin":
-        return HOME_DIR / "Library" / "Application Support" / "Martix"
-    base = os.environ.get("XDG_DATA_HOME") or (HOME_DIR / ".local" / "share")
-    return Path(base) / "martix"
-
-
-DATA_DIR = Path(_env.get("MARTIX_DATA_DIR", "").strip()).expanduser() if _env.get("MARTIX_DATA_DIR", "").strip() else _default_data_dir()
+DATA_DIR = (
+    Path(_env.get("MARTIX_DATA_DIR", "").strip()).expanduser()
+    if _env.get("MARTIX_DATA_DIR", "").strip()
+    else _default_data_dir()
+)
 TRASH_DIR = DATA_DIR / "trash"
+
+# Source installs keep the historical database location for compatibility.
+# Frozen builds persist under the OS application-data directory instead of the
+# temporary PyInstaller extraction directory.
+DB_PATH = (DATA_DIR / "martix.db") if FROZEN else (PROJECT_DIR / "database" / "martix.db")
+_OLD_DB_PATH = PROJECT_DIR / "database" / "sortix.db"
+if not FROZEN and not DB_PATH.exists() and _OLD_DB_PATH.exists():
+    try:
+        _OLD_DB_PATH.rename(DB_PATH)
+    except Exception:
+        pass
+
+SCHEMA_PATH = RESOURCE_DIR / "database" / "scripts" / "schema.sql"
+CATEGORIES_FILE = CONFIG_DIR / "categories.json"
 
 # Dias que se conservan los archivos en la papelera de Martix antes de
 # purgarse definitivamente.
-TRASH_RETENTION_DAYS = int(_env.get("MARTIX_TRASH_RETENTION_DAYS", "30"))
+TRASH_RETENTION_DAYS = _env_int("MARTIX_TRASH_RETENTION_DAYS", 30, minimum=1)
 
 # Token compartido para la API (cabecera X-Martix-Token). Opcional mientras
 # Martix escuche solo en 127.0.0.1; obligatorio si se expone HOST a la red.
@@ -86,7 +116,18 @@ def _env_flag(name: str) -> bool:
 # LLM local (Ollama) para nombrar carpetas de documentos que no encajan en
 # ningun Tema ni subcategoria. Apagado por defecto: en equipos modestos no
 # se nota nada y todo sigue funcionando por reglas/patrones.
+_llm_explicitly_configured = any(
+    key in _env for key in ("MARTIX_LLM", "SORTIX_LLM")
+)
 LLM_ENABLED = _env_flag("MARTIX_LLM") or _env_flag("SORTIX_LLM")
+# Si el usuario no ha tomado una decision, Martix puede detectar de forma
+# local si Ollama esta disponible y si el equipo tiene recursos suficientes.
+# Un MARTIX_LLM=0 explicito sigue siendo una opt-out real.
+LLM_AUTO = (
+    _env_flag("MARTIX_LLM_AUTO")
+    if "MARTIX_LLM_AUTO" in _env
+    else not _llm_explicitly_configured
+)
 LLM_URL = _env.get("MARTIX_LLM_URL", _env.get("SORTIX_LLM_URL", "http://127.0.0.1:11434"))
 LLM_MODEL = _env.get("MARTIX_LLM_MODEL", _env.get("SORTIX_LLM_MODEL", "llama3.2"))
 

@@ -168,28 +168,46 @@ class _DownloadEventHandler(FileSystemEventHandler):
                 if self._wait_until_stable(path):
                     result = organize_file(path)
                     if result:
-                        filename = result.get("filename", path.name)
-                        category = result.get("category", "")
-                        dest_str = result.get("destination", "")
-
-                        display_dest = ""
-                        if dest_str:
-                            try:
-                                from config.settings import HOME_DIR
-                                rel_dest = Path(dest_str).relative_to(HOME_DIR.resolve())
-                                display_dest = f"~/{rel_dest}"
-                            except Exception:
-                                display_dest = dest_str
-
-                        item_label = "Carpeta organizada" if result.get("is_dir") else "Archivo organizado"
-                        if display_dest:
-                            msg = f"{item_label}: {filename}\n📍 Movido a: {display_dest}"
-                        elif category:
-                            msg = f"{item_label}: {filename} ({category})"
+                        items = result.get("items") or [result]
+                        if len(items) > 1:
+                            send_notification(
+                                "Martix",
+                                f"Carpeta organizada: {result.get('filename', path.name)}\n"
+                                f"{len(items)} elementos enviados a sus carpetas correspondientes.",
+                            )
                         else:
-                            msg = f"{item_label}: {filename}"
+                            item = items[0]
+                            filename = item.get("filename", path.name)
+                            category = item.get("category", "")
+                            dest_str = item.get("destination", "")
 
-                        send_notification("Martix", msg)
+                            display_dest = ""
+                            if dest_str:
+                                try:
+                                    from config.settings import HOME_DIR
+                                    rel_dest = Path(dest_str).relative_to(HOME_DIR.resolve())
+                                    display_dest = f"~/{rel_dest}"
+                                except Exception:
+                                    display_dest = dest_str
+
+                            item_label = "Archivo organizado"
+                            if display_dest:
+                                msg = f"{item_label}: {filename}\n📍 Movido a: {display_dest}"
+                            elif category:
+                                msg = f"{item_label}: {filename} ({category})"
+                            else:
+                                msg = f"{item_label}: {filename}"
+
+                            send_notification("Martix", msg)
+
+                        cleanup_items = [item.get("cleanup") for item in items if item.get("cleanup")]
+                        pending = [item for item in cleanup_items if item.get("action") == "notify"]
+                        if pending:
+                            send_notification(
+                                "Martix: revisión pendiente",
+                                f"Hay {len(pending)} archivo(s) que podrían ser basura de instalación. "
+                                "Revísalos desde Martix antes de eliminarlos.",
+                            )
             except Exception as e:
                 print(f"[Martix Watcher Error] No se pudo organizar {path.name}: {e}", file=sys.stderr)
             finally:
