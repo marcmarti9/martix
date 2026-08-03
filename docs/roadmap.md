@@ -97,12 +97,12 @@ All suites passing cleanly in GitHub Actions CI workflows.
 - [x] **Comprehensive security and quality audit.** (2026-07-25) Fixed 16 logic bugs and 2 security vulnerabilities; implemented regression and security test suites. See [audit-2026-07.md](audit-2026-07.md).
 - [x] **Re-orderable rule priorities.** (2026-07-25) Support for multiple rules per file extension with drag-and-drop priority ordering.
 - [x] **Mandatory restorable trash engine.** (2026-07-25) Implemented `app/trash.py`.
+- [x] **Frontend Trash Management UI.** (2026-08-03) Full UI tab for viewing, restoring, purging individual or all quarantined items with active mode status.
+- [x] **Batch Operation Reversal.** (2026-08-03) Multi-selection checkboxes in history log with `/api/log/undo-batch` endpoint.
 
 ### Pending Backlog Items
 
-- [ ] **Frontend Trash Management UI.** The REST API (`/api/trash`) supports listing and restoring items; UI management panel pending for environments without native `Send2Trash`.
 - [ ] **Logical OR & Nested Rule Condition Groups.** Expand rule conditions to support `{"any": [...]}` condition structures.
-- [ ] **Batch Operation Reversal.** Support bulk undo ("revert all moves in the last hour") leveraging `moves_log` timestamps.
 - [ ] **Incremental SSE Disk Scanning.** Replace POST scan requests with real-time Server-Sent Events progress reporting.
 - [ ] **Rule Profile Presets.** Switchable rule profiles (e.g., "Work" vs "Personal").
 - [ ] **Tax & Identifier Pattern Detection.** Add specialized financial rule condition extractors (tax IDs, invoice totals).

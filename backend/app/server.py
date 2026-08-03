@@ -16,6 +16,7 @@ from app.organizer import (
     organize_directory_report,
     simulate_directory,
     undo_move,
+    batch_undo_moves,
 )
 from app.scheduler import scheduler
 from app.watcher import PatrolManager
@@ -366,6 +367,15 @@ def create_app() -> Flask:
             return jsonify({"error": error}), 409
         return jsonify(result)
 
+    @app.post("/api/log/undo-batch")
+    def undo_batch_moves():
+        payload = request.get_json(silent=True) or {}
+        move_ids = payload.get("move_ids")
+        if not isinstance(move_ids, list) or not move_ids:
+            return jsonify({"error": "se requiere una lista de 'move_ids'"}), 400
+        result = batch_undo_moves(move_ids)
+        return jsonify(result)
+
     @app.get("/api/topics")
     def get_topics():
         return jsonify(db.list_topics())
@@ -695,6 +705,12 @@ def create_app() -> Flask:
     @app.delete("/api/trash/<entry_id>")
     def purge_trash_entry(entry_id: str):
         removed = trash.purge(entry_id=entry_id)
+        return jsonify({"success": True, "purged": removed})
+
+    @app.delete("/api/trash")
+    def purge_all_trash():
+        days = request.args.get("older_than", default=0, type=int)
+        removed = trash.purge(older_than_days=days)
         return jsonify({"success": True, "purged": removed})
 
     @app.get("/api/maintenance/rules")

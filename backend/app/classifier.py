@@ -417,13 +417,14 @@ def _match_subcategory(category: str, stem: str) -> dict | None:
     return None
 
 
-def classify_folder(path: Path) -> dict:
+def classify_folder(path: Path, topics: list[dict] | None = None) -> dict:
     """Clasifica un directorio entero según el nombre de la carpeta, temas,
     subcategorías o contenido predominante dentro del mismo."""
     stem = path.name
 
     # 1. Comprobar Temas del usuario por nombre de carpeta
-    topics = db.list_topics()
+    if topics is None:
+        topics = db.list_topics()
     if topics:
         topic = _best_topic_for_text(stem, topics)
         if topic:
@@ -520,7 +521,7 @@ def classify(path: Path, topics: list[dict] | None = None) -> dict:
         topics = db.list_topics()
 
     if path.is_dir():
-        return classify_folder(path)
+        return classify_folder(path, topics=topics)
 
     ext = path.suffix.lower().lstrip(".")
     category = _EXT_TO_CATEGORY.get(ext)

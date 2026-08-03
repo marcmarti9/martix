@@ -21,11 +21,26 @@ def init_db() -> None:
 _schema_lock = threading.Lock()
 _schema_checked_for: str | None = None
 
+_rules_cache: list[dict] | None = None
+_rules_cache_lock = threading.Lock()
+
+_topics_cache: list[dict] | None = None
+_topics_cache_lock = threading.Lock()
+
+
+def _invalidate_db_caches() -> None:
+    global _rules_cache, _topics_cache
+    with _rules_cache_lock:
+        _rules_cache = None
+    with _topics_cache_lock:
+        _topics_cache = None
+
 
 def _invalidate_schema_cache() -> None:
     global _schema_checked_for
     with _schema_lock:
         _schema_checked_for = None
+    _invalidate_db_caches()
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -175,6 +190,19 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ON cleanup_suggestions(status, created_at)"
         )
 
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_moves_log_undone_moved "
+        "ON moves_log(undone_at, moved_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_moves_log_undone_category "
+        "ON moves_log(undone_at, category)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rules_ext_priority "
+        "ON rules(extension, priority)"
+    )
+
 
 @contextmanager
 def get_conn():
@@ -224,15 +252,23 @@ _RULES_ORDER = (
 
 
 def list_rules() -> list[dict]:
+    global _rules_cache
+    with _rules_cache_lock:
+        if _rules_cache is not None:
+            return [dict(r) for r in _rules_cache]
     with get_conn() as conn:
         rows = conn.execute(f"SELECT * FROM rules {_RULES_ORDER}").fetchall()
-        return [dict(r) for r in rows]
+        result = [dict(r) for r in rows]
+        with _rules_cache_lock:
+            _rules_cache = result
+        return [dict(r) for r in result]
 
 
 def get_rule(rule_id: int) -> dict | None:
-    with get_conn() as conn:
-        row = conn.execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()
-        return dict(row) if row else None
+    for r in list_rules():
+        if r.get("id") == rule_id:
+            return dict(r)
+    return None
 
 
 def add_rule(extension: str, destination: str, rename_pattern: str | None = None,
@@ -241,17 +277,20 @@ def add_rule(extension: str, destination: str, rename_pattern: str | None = None
     permite encadenar condiciones distintas sobre el mismo tipo de archivo."""
     extension = extension.lower().lstrip(".").strip()
     destination = destination.strip().strip("/")
-    with get_conn() as conn:
-        if priority is None:
-            row = conn.execute("SELECT COALESCE(MAX(priority), 99) + 1 AS p FROM rules").fetchone()
-            priority = row["p"]
-        cur = conn.execute(
-            """INSERT INTO rules (extension, destination, rename_pattern, conditions, priority)
-               VALUES (?, ?, ?, ?, ?)""",
-            (extension, destination, rename_pattern, conditions, int(priority)),
-        )
-        row = conn.execute("SELECT * FROM rules WHERE id = ?", (cur.lastrowid,)).fetchone()
-        return dict(row)
+    try:
+        with get_conn() as conn:
+            if priority is None:
+                row = conn.execute("SELECT COALESCE(MAX(priority), 99) + 1 AS p FROM rules").fetchone()
+                priority = row["p"]
+            cur = conn.execute(
+                """INSERT INTO rules (extension, destination, rename_pattern, conditions, priority)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (extension, destination, rename_pattern, conditions, int(priority)),
+            )
+            row = conn.execute("SELECT * FROM rules WHERE id = ?", (cur.lastrowid,)).fetchone()
+            return dict(row)
+    finally:
+        _invalidate_db_caches()
 
 
 def update_rule(rule_id: int, **fields) -> dict | None:
@@ -268,27 +307,36 @@ def update_rule(rule_id: int, **fields) -> dict | None:
         updates["priority"] = int(updates["priority"])
 
     assignments = ", ".join(f"{k} = ?" for k in updates)
-    with get_conn() as conn:
-        conn.execute(
-            f"UPDATE rules SET {assignments} WHERE id = ?",
-            (*updates.values(), rule_id),
-        )
-        row = conn.execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()
-        return dict(row) if row else None
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                f"UPDATE rules SET {assignments} WHERE id = ?",
+                (*updates.values(), rule_id),
+            )
+            row = conn.execute("SELECT * FROM rules WHERE id = ?", (rule_id,)).fetchone()
+            return dict(row) if row else None
+    finally:
+        _invalidate_db_caches()
 
 
 def reorder_rules(ordered_ids: list[int]) -> list[dict]:
     """Reasigna prioridades segun el orden recibido desde la interfaz."""
-    with get_conn() as conn:
-        for position, rule_id in enumerate(ordered_ids, start=1):
-            conn.execute("UPDATE rules SET priority = ? WHERE id = ?", (position, int(rule_id)))
-        rows = conn.execute(f"SELECT * FROM rules {_RULES_ORDER}").fetchall()
-        return [dict(r) for r in rows]
+    try:
+        with get_conn() as conn:
+            for position, rule_id in enumerate(ordered_ids, start=1):
+                conn.execute("UPDATE rules SET priority = ? WHERE id = ?", (position, int(rule_id)))
+            rows = conn.execute(f"SELECT * FROM rules {_RULES_ORDER}").fetchall()
+            return [dict(r) for r in rows]
+    finally:
+        _invalidate_db_caches()
 
 
 def delete_rule(rule_id: int) -> None:
-    with get_conn() as conn:
-        conn.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
+    try:
+        with get_conn() as conn:
+            conn.execute("DELETE FROM rules WHERE id = ?", (rule_id,))
+    finally:
+        _invalidate_db_caches()
 
 
 def get_rule_for_extension(extension: str) -> dict | None:
@@ -299,12 +347,8 @@ def get_rule_for_extension(extension: str) -> dict | None:
 
 
 def list_rules_for_extension(extension: str) -> list[dict]:
-    with get_conn() as conn:
-        rows = conn.execute(
-            f"SELECT * FROM rules WHERE extension = ? {_RULES_ORDER}",
-            (extension.lower().lstrip("."),),
-        ).fetchall()
-        return [dict(r) for r in rows]
+    ext = extension.lower().lstrip(".")
+    return [dict(r) for r in list_rules() if r.get("extension") == ext]
 
 
 # ---- log de movimientos / estadisticas -------------------------------------
@@ -452,30 +496,53 @@ def _topic_row_to_dict(row: sqlite3.Row) -> dict:
 
 
 def list_topics() -> list[dict]:
+    global _topics_cache
+    with _topics_cache_lock:
+        if _topics_cache is not None:
+            return [dict(t, keywords=list(t["keywords"])) for t in _topics_cache]
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM topics ORDER BY name").fetchall()
-        return [_topic_row_to_dict(r) for r in rows]
+        result = [_topic_row_to_dict(r) for r in rows]
+        with _topics_cache_lock:
+            _topics_cache = result
+        return [dict(t, keywords=list(t["keywords"])) for t in result]
 
 
 def add_topic(name: str, destination: str, keywords: list[str], rename_pattern: str | None = None) -> dict:
     name = name.strip()
     destination = destination.strip().strip("/")
     keywords_str = ",".join(k.strip() for k in keywords if k.strip())
-    with get_conn() as conn:
-        conn.execute(
-            """INSERT INTO topics (name, destination, keywords, rename_pattern) VALUES (?, ?, ?, ?)
-               ON CONFLICT(name) DO UPDATE SET destination = excluded.destination,
-                                                keywords = excluded.keywords,
-                                                rename_pattern = excluded.rename_pattern""",
-            (name, destination, keywords_str, rename_pattern),
-        )
-        row = conn.execute("SELECT * FROM topics WHERE name = ?", (name,)).fetchone()
-        return _topic_row_to_dict(row)
+    try:
+        with get_conn() as conn:
+            conn.execute(
+                """INSERT INTO topics (name, destination, keywords, rename_pattern) VALUES (?, ?, ?, ?)
+                   ON CONFLICT(name) DO UPDATE SET destination = excluded.destination,
+                                                    keywords = excluded.keywords,
+                                                    rename_pattern = excluded.rename_pattern""",
+                (name, destination, keywords_str, rename_pattern),
+            )
+            row = conn.execute("SELECT * FROM topics WHERE name = ?", (name,)).fetchone()
+            return _topic_row_to_dict(row)
+    finally:
+        _invalidate_db_caches()
+        try:
+            from app.organizer import invalidate_scan_dirs_cache
+            invalidate_scan_dirs_cache()
+        except Exception:
+            pass
 
 
 def delete_topic(topic_id: int) -> None:
-    with get_conn() as conn:
-        conn.execute("DELETE FROM topics WHERE id = ?", (topic_id,))
+    try:
+        with get_conn() as conn:
+            conn.execute("DELETE FROM topics WHERE id = ?", (topic_id,))
+    finally:
+        _invalidate_db_caches()
+        try:
+            from app.organizer import invalidate_scan_dirs_cache
+            invalidate_scan_dirs_cache()
+        except Exception:
+            pass
 
 
 # ---- maintenance rules -------------------------------------------------------

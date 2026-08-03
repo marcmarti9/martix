@@ -587,6 +587,67 @@ assert check_conditions(test_age_file, "txt", cond_lte_9) is False
 test_age_file.unlink()
 print("OK condicion age_days en check_conditions")
 
+# 1b) Prueba de condiciones OR ('any')
+or_file_a = downloads / "factura_luz.pdf"
+or_file_a.write_bytes(b"%PDF-1.4 factura test")
+or_file_b = downloads / "recibo_agua.pdf"
+or_file_b.write_bytes(b"%PDF-1.4 recibo test")
+or_file_c = downloads / "documento_otro.pdf"
+or_file_c.write_bytes(b"%PDF-1.4 otro test")
+
+# Estructura {"operator": "any", "conditions": [...]}
+cond_or_op = json.dumps({
+    "operator": "any",
+    "conditions": [
+        {"field": "name", "operator": "contains", "value": "factura"},
+        {"field": "name", "operator": "contains", "value": "recibo"}
+    ]
+})
+
+# Estructura {"any": [...]}
+cond_or_any = json.dumps({
+    "any": [
+        {"field": "name", "operator": "contains", "value": "factura"},
+        {"field": "name", "operator": "contains", "value": "recibo"}
+    ]
+})
+
+assert check_conditions(or_file_a, "pdf", cond_or_op) is True
+assert check_conditions(or_file_b, "pdf", cond_or_op) is True
+assert check_conditions(or_file_c, "pdf", cond_or_op) is False
+
+assert check_conditions(or_file_a, "pdf", cond_or_any) is True
+assert check_conditions(or_file_b, "pdf", cond_or_any) is True
+assert check_conditions(or_file_c, "pdf", cond_or_any) is False
+
+# Prueba a través de la API y organizador con regla OR
+r_rule = client.post("/api/rules", json={
+    "extension": "pdf",
+    "destination": "Documents/FacturasYRecibos",
+    "conditions": {
+        "operator": "any",
+        "conditions": [
+            {"field": "name", "operator": "contains", "value": "factura"},
+            {"field": "name", "operator": "contains", "value": "recibo"}
+        ]
+    }
+})
+assert r_rule.status_code == 201, r_rule.data
+
+moved_or = organize_directory(downloads)
+moved_filenames = {m["filename"]: m["destination"] for m in moved_or}
+assert "factura_luz.pdf" in moved_filenames
+assert "Documents/FacturasYRecibos" in moved_filenames["factura_luz.pdf"]
+assert "recibo_agua.pdf" in moved_filenames
+assert "Documents/FacturasYRecibos" in moved_filenames["recibo_agua.pdf"]
+assert "documento_otro.pdf" not in moved_filenames or "FacturasYRecibos" not in moved_filenames.get("documento_otro.pdf", "")
+
+if (downloads / "documento_otro.pdf").exists():
+    (downloads / "documento_otro.pdf").unlink()
+
+print("OK condiciones logicas OR ('any') en check_conditions, API y organizador")
+
+
 # 2) Descompresion segura de Zip y Tar + prevencion de Zip-Slip
 archive_test_dir = downloads / "ArchiveTest"
 archive_test_dir.mkdir(parents=True, exist_ok=True)
@@ -899,5 +960,44 @@ assert res_folder["category"] == "pictures" or "Pictures" in res_folder["destina
 assert not test_folder.exists()
 assert Path(res_folder["destination"]).exists()
 print("OK organizacion de carpetas completas")
+
+# ---- Pruebas de undo-batch y purge-all trash ----
+f1 = downloads / "batch1.pdf"
+f2 = downloads / "batch2.pdf"
+f1.write_text("batch1 content")
+f2.write_text("batch2 content")
+
+res1 = organize_file(f1)
+res2 = organize_file(f2)
+assert res1 is not None and res2 is not None
+
+moves_list = client.get("/api/log?limit=10").get_json()
+undoable_ids = [m["id"] for m in moves_list if not m["undone_at"] and m["undoable"] != False]
+assert len(undoable_ids) >= 2
+
+r_batch = client.post("/api/log/undo-batch", json={"move_ids": undoable_ids[:2]})
+assert r_batch.status_code == 200, r_batch.data
+batch_json = r_batch.get_json()
+assert batch_json["success_count"] == 2
+assert f1.exists() or f2.exists()
+
+# Test trash listing & purge all
+dummy_trash = downloads / "trash_test_item.txt"
+dummy_trash.write_text("trash item content")
+from app import trash
+trash.move_to_trash(dummy_trash)
+
+r_trash = client.get("/api/trash")
+assert r_trash.status_code == 200
+trash_data = r_trash.get_json()
+assert "items" in trash_data
+
+r_purge = client.delete("/api/trash")
+assert r_purge.status_code == 200
+assert r_purge.get_json()["success"] is True
+
+r_trash_after = client.get("/api/trash")
+assert len(r_trash_after.get_json()["items"]) == 0
+print("OK undo-batch y purge-all trash")
 
 print("\nTODAS LAS PRUEBAS PASARON")

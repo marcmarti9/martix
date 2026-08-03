@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS rules (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rules_extension ON rules(extension);
+CREATE INDEX IF NOT EXISTS idx_rules_ext_priority ON rules(extension, priority);
 
 CREATE TABLE IF NOT EXISTS moves_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

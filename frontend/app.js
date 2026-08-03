@@ -140,6 +140,22 @@ const TRANSLATIONS = {
         status_undone_done: '"{filename}" devuelto a su carpeta de origen.',
         status_undo_error: "No se pudo deshacer el movimiento.",
         history_undone_label: "deshecho",
+        select_all_btn: "Seleccionar todo",
+        undo_selected_btn: "Deshacer seleccionados",
+        status_batch_undo_done: "Deshechos {count} movimiento(s) correctamente.",
+
+        tab_trash: "Papelera",
+        trash_hint: "Elementos en cuarentena local de Martix. Puedes recuperarlos o eliminarlos definitivamente.",
+        trash_empty: "La papelera de cuarentena está vacía.",
+        trash_native_active: "Papelera nativa del sistema",
+        trash_quarantine_active: "Cuarentena local de Martix",
+        purge_all_trash_btn: "Vaciar papelera",
+        purge_item_btn: "Eliminar definitivamente",
+        restore_item_btn: "Restaurar",
+        status_trash_restored: '"{filename}" restaurado correctamente.',
+        status_trash_purged: "Papelera vaciada ({count} elemento(s) eliminados).",
+        status_trash_item_purged: '"{filename}" eliminado definitivamente.',
+        confirm_purge_all_trash: "¿Seguro que deseas eliminar todos los elementos de la cuarentena definitivamente?",
         
         export_rules_btn: "Exportar reglas (JSON)",
         import_rules_btn: "Importar reglas (JSON)",
@@ -509,6 +525,22 @@ const TRANSLATIONS = {
         status_undone_done: '"{filename}" returned to its source folder.',
         status_undo_error: "Could not undo the movement.",
         history_undone_label: "undone",
+        select_all_btn: "Select all",
+        undo_selected_btn: "Undo selected",
+        status_batch_undo_done: "Successfully undone {count} move(s).",
+
+        tab_trash: "Trash",
+        trash_hint: "Items in Martix local quarantine. You can restore them or permanently delete them.",
+        trash_empty: "Local quarantine trash is empty.",
+        trash_native_active: "System native trash",
+        trash_quarantine_active: "Martix local quarantine",
+        purge_all_trash_btn: "Empty trash",
+        purge_item_btn: "Delete permanently",
+        restore_item_btn: "Restore",
+        status_trash_restored: '"{filename}" restored successfully.',
+        status_trash_purged: "Trash emptied ({count} item(s) deleted).",
+        status_trash_item_purged: '"{filename}" deleted permanently.',
+        confirm_purge_all_trash: "Are you sure you want to permanently delete all items in local quarantine?",
         
         export_rules_btn: "Export rules (JSON)",
         import_rules_btn: "Import rules (JSON)",
@@ -1470,14 +1502,9 @@ const btnAddCondition = document.getElementById("btn-add-condition");
 function createConditionRow(data = {}) {
     const row = document.createElement("div");
     row.className = "condition-row";
-    row.style.display = "flex";
-    row.style.gap = "6px";
-    row.style.marginBottom = "6px";
-    row.style.width = "100%";
-    row.style.alignItems = "center";
 
     row.innerHTML = `
-        <select class="cond-field lang-select" style="flex: 1.2; min-width: 80px; padding: 6px; background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--color-input-text); border-radius: 6px; font-size: 0.85rem;">
+        <select class="cond-field select-control" aria-label="${t("cond_field_name") || "Campo"}">
             <option value="name">${t("cond_field_name")}</option>
             <option value="stem">${t("cond_field_stem")}</option>
             <option value="extension">${t("cond_field_extension")}</option>
@@ -1491,7 +1518,7 @@ function createConditionRow(data = {}) {
             <option value="camera">${t("cond_field_camera")}</option>
             <option value="exif_date">${t("cond_field_exif_date")}</option>
         </select>
-        <select class="cond-operator lang-select" style="flex: 1; min-width: 80px; padding: 6px; background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--color-input-text); border-radius: 6px; font-size: 0.85rem;">
+        <select class="cond-operator select-control" aria-label="Operador">
             <option value="contains">${t("cond_op_contains")}</option>
             <option value="not_contains">${t("cond_op_not_contains")}</option>
             <option value="equals">${t("cond_op_equals")}</option>
@@ -1502,8 +1529,8 @@ function createConditionRow(data = {}) {
             <option value="gte">${t("cond_op_gte")}</option>
             <option value="lte">${t("cond_op_lte")}</option>
         </select>
-        <input type="text" class="cond-value" placeholder="${t("cond_value_placeholder")}" style="flex: 2; min-width: 100px; padding: 6px; background-color: var(--bg-input); border: 1px solid var(--border-input); color: var(--color-input-text); border-radius: 6px; font-size: 0.85rem;">
-        <button type="button" class="btn-remove-cond icon-btn danger" style="padding: 6px 10px; font-size: 0.95rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-input); background: var(--bg-item-hover); color: var(--color-danger);">&times;</button>
+        <input type="text" class="cond-value text-control" placeholder="${t("cond_value_placeholder")}" aria-label="Valor">
+        <button type="button" class="btn-remove-cond icon-button danger" title="Eliminar condición" aria-label="Eliminar condición">&times;</button>
     `;
 
     const fieldSel = row.querySelector(".cond-field");
@@ -1677,6 +1704,7 @@ ruleForm.addEventListener("submit", async (event) => {
 // ---- historial de movimientos + deshacer -----------------------------------
 
 const historyListEl = document.getElementById("history-list");
+let selectedHistoryIds = new Set();
 
 function formatDate(sqlDate) {
     if (!sqlDate) return "";
@@ -1687,6 +1715,10 @@ function formatDate(sqlDate) {
 }
 
 async function refreshHistory() {
+    selectedHistoryIds.clear();
+    const btnUndoSelected = document.getElementById("btn-history-undo-selected");
+    if (btnUndoSelected) btnUndoSelected.disabled = true;
+
     let moves;
     try {
         moves = await fetchJSON("/api/log?limit=50");
@@ -1703,15 +1735,31 @@ async function refreshHistory() {
         const li = document.createElement("li");
         if (move.undone_at) li.classList.add("undone");
         const undoneText = move.undone_at ? ` &middot; ${t("history_undone_label")}` : "";
-        li.innerHTML = `<div class="settings-item-main">
-            <strong>${escapeHtml(move.filename)}</strong>
-            <span class="muted">${escapeHtml(move.category)} &rarr; ${escapeHtml(move.destination)}</span>
-            <span class="keywords">${escapeHtml(formatDate(move.moved_at))}${undoneText}</span>
-        </div>`;
-        // Un desempaquetado o un borrado de mantenimiento no son movimientos
-        // reversibles: el backend los marca con undoable=false y aqui no se
-        // ofrece un boton "Deshacer" que siempre iba a responder 409.
-        if (!move.undone_at && move.undoable !== false) {
+        const isUndoable = !move.undone_at && move.undoable !== false;
+
+        let checkboxHtml = "";
+        if (isUndoable) {
+            checkboxHtml = `<input type="checkbox" class="history-item-checkbox" data-move-id="${move.id}" style="margin-right: 8px; cursor: pointer;">`;
+        }
+
+        li.innerHTML = `
+            ${checkboxHtml}
+            <div class="settings-item-main">
+                <strong>${escapeHtml(move.filename)}</strong>
+                <span class="muted">${escapeHtml(move.category)} &rarr; ${escapeHtml(move.destination)}</span>
+                <span class="keywords">${escapeHtml(formatDate(move.moved_at))}${undoneText}</span>
+            </div>`;
+
+        if (isUndoable) {
+            const checkbox = li.querySelector(".history-item-checkbox");
+            if (checkbox) {
+                checkbox.addEventListener("change", (e) => {
+                    if (e.target.checked) selectedHistoryIds.add(move.id);
+                    else selectedHistoryIds.delete(move.id);
+                    if (btnUndoSelected) btnUndoSelected.disabled = selectedHistoryIds.size === 0;
+                });
+            }
+
             const actionContainer = document.createElement("div");
             actionContainer.style.display = "flex";
             actionContainer.style.gap = "6px";
@@ -1782,6 +1830,145 @@ async function refreshHistory() {
         }
         historyListEl.appendChild(li);
     }
+}
+
+const btnHistorySelectAll = document.getElementById("btn-history-select-all");
+if (btnHistorySelectAll) {
+    btnHistorySelectAll.addEventListener("click", () => {
+        const checkboxes = document.querySelectorAll(".history-item-checkbox");
+        const allChecked = Array.from(checkboxes).length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => {
+            cb.checked = !allChecked;
+            const mid = parseInt(cb.dataset.moveId, 10);
+            if (!allChecked) selectedHistoryIds.add(mid);
+            else selectedHistoryIds.delete(mid);
+        });
+        const btnUndoSelected = document.getElementById("btn-history-undo-selected");
+        if (btnUndoSelected) btnUndoSelected.disabled = selectedHistoryIds.size === 0;
+    });
+}
+
+const btnHistoryUndoSelected = document.getElementById("btn-history-undo-selected");
+if (btnHistoryUndoSelected) {
+    btnHistoryUndoSelected.addEventListener("click", async () => {
+        if (selectedHistoryIds.size === 0) return;
+        btnHistoryUndoSelected.disabled = true;
+        try {
+            const res = await fetchJSON("/api/log/undo-batch", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ move_ids: Array.from(selectedHistoryIds) })
+            });
+            showStatus(t("status_batch_undo_done").replace("{count}", res.success_count || 0));
+            await Promise.all([refreshHistory(), refreshStatus()]);
+            if (currentPath !== null) await renderContent();
+        } catch (err) {
+            showStatus(err.message || t("status_undo_error"), true);
+        } finally {
+            btnHistoryUndoSelected.disabled = false;
+        }
+    });
+}
+
+// ---- gestion de papelera / cuarentena ----------------------------------------
+
+const trashListEl = document.getElementById("trash-list");
+const trashEmptyMsgEl = document.getElementById("trash-empty-msg");
+const trashStatusTextEl = document.getElementById("trash-status-text");
+
+async function refreshTrash() {
+    if (!trashListEl) return;
+    let data;
+    try {
+        data = await fetchJSON("/api/trash");
+    } catch (err) {
+        trashListEl.innerHTML = `<li class="empty">${t("status_import_error")}</li>`;
+        return;
+    }
+
+    if (trashStatusTextEl) {
+        trashStatusTextEl.textContent = data.native ? (t("trash_native_active") || "Papelera nativa del sistema") : (t("trash_quarantine_active") || "Cuarentena local de Martix");
+    }
+
+    const items = data.items || [];
+    trashListEl.innerHTML = "";
+
+    if (items.length === 0) {
+        if (trashEmptyMsgEl) trashEmptyMsgEl.hidden = false;
+        return;
+    } else {
+        if (trashEmptyMsgEl) trashEmptyMsgEl.hidden = true;
+    }
+
+    for (const item of items) {
+        const li = document.createElement("li");
+        const dateStr = item.deleted_at ? formatDate(item.deleted_at) : "";
+        const sizeStr = formatSize(item.size_bytes || 0);
+
+        li.innerHTML = `
+            <div class="settings-item-main">
+                <strong>${escapeHtml(item.name)}</strong>
+                <span class="muted">${escapeHtml(item.original_path || "")}</span>
+                <span class="keywords">${sizeStr} &middot; ${dateStr}</span>
+            </div>`;
+
+        const actionContainer = document.createElement("div");
+        actionContainer.style.display = "flex";
+        actionContainer.style.gap = "6px";
+
+        const restoreBtn = document.createElement("button");
+        restoreBtn.className = "btn btn-small btn-quiet";
+        restoreBtn.textContent = t("restore_item_btn") || "Restaurar";
+        restoreBtn.addEventListener("click", async () => {
+            restoreBtn.disabled = true;
+            try {
+                const res = await fetchJSON(`/api/trash/${item.id}/restore`, { method: "POST" });
+                showStatus((t("status_trash_restored") || '"{filename}" restaurado.').replace("{filename}", item.name));
+                await refreshTrash();
+                if (currentPath !== null) await renderContent();
+            } catch (err) {
+                restoreBtn.disabled = false;
+                showStatus(err.message || "Error al restaurar", true);
+            }
+        });
+
+        const purgeBtn = document.createElement("button");
+        purgeBtn.className = "btn btn-small btn-danger";
+        purgeBtn.textContent = t("purge_item_btn") || "Eliminar";
+        purgeBtn.addEventListener("click", async () => {
+            purgeBtn.disabled = true;
+            try {
+                await fetchJSON(`/api/trash/${item.id}`, { method: "DELETE" });
+                showStatus((t("status_trash_item_purged") || '"{filename}" eliminado.').replace("{filename}", item.name));
+                await refreshTrash();
+            } catch (err) {
+                purgeBtn.disabled = false;
+                showStatus(err.message || "Error al eliminar", true);
+            }
+        });
+
+        actionContainer.appendChild(restoreBtn);
+        actionContainer.appendChild(purgeBtn);
+        li.appendChild(actionContainer);
+        trashListEl.appendChild(li);
+    }
+}
+
+const btnPurgeAllTrash = document.getElementById("btn-purge-all-trash");
+if (btnPurgeAllTrash) {
+    btnPurgeAllTrash.addEventListener("click", async () => {
+        if (!confirm(t("confirm_purge_all_trash") || "¿Eliminar todo definitivamente?")) return;
+        btnPurgeAllTrash.disabled = true;
+        try {
+            const res = await fetchJSON("/api/trash", { method: "DELETE" });
+            showStatus((t("status_trash_purged") || "Papelera vaciada.").replace("{count}", res.purged || 0));
+            await refreshTrash();
+        } catch (err) {
+            showStatus(err.message || "Error al vaciar papelera", true);
+        } finally {
+            btnPurgeAllTrash.disabled = false;
+        }
+    });
 }
 
 // ---- ajustes generales (duplicados) -------------------------------------------
@@ -2273,6 +2460,7 @@ for (const tabBtn of document.querySelectorAll(".tab-btn")) {
         if (tabBtn.dataset.tab === "general") refreshGeneralSettings();
         if (tabBtn.dataset.tab === "duplicates") scanDuplicates();
         if (tabBtn.dataset.tab === "maintenance") refreshMaintenance();
+        if (tabBtn.dataset.tab === "trash") refreshTrash();
         if (tabBtn.dataset.tab === "watched") refreshWatchedFolders();
         if (tabBtn.dataset.tab === "stats") refreshStatistics();
         if (tabBtn.dataset.tab === "ai") refreshAiSettings();

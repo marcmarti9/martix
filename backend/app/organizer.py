@@ -424,61 +424,104 @@ def _compare_numeric(actual, expected, op: str) -> bool | None:
     }.get(op)
 
 
-def check_conditions(path: Path, ext: str, conditions_str: str | None,
-                     facts: FileFacts | None = None) -> bool:
-    """Evalua las condiciones de una regla en AND. Si un campo no se puede
-    obtener, la regla no casa."""
-    if not conditions_str:
-        return True  # Si no hay condiciones adicionales, es un match directo
-    try:
-        conditions = json.loads(conditions_str)
-    except Exception:
+def _eval_leaf_condition(cond: dict, facts: FileFacts) -> bool:
+    field = cond.get("field")
+    op = cond.get("operator")
+    val = cond.get("value")
+    if not field or not op:
         return False
-    if not isinstance(conditions, list):
+
+    actual = facts.value_for(field)
+    if actual is _UNAVAILABLE or actual is None:
+        return False
+
+    if op in ("gt", ">", "lt", "<", "gte", ">=", "lte", "<="):
+        return _compare_numeric(actual, val, op) is True
+    elif op in ("equals", "=="):
+        numeric = _compare_numeric(actual, val, op)
+        if numeric is None:
+            return normalize(str(actual)) == normalize(str(val))
+        return numeric
+    elif op == "contains":
+        return isinstance(actual, str) and normalize(str(val)) in normalize(actual)
+    elif op == "not_contains":
+        return isinstance(actual, str) and normalize(str(val)) not in normalize(actual)
+    elif op == "starts_with":
+        return isinstance(actual, str) and normalize(actual).startswith(normalize(str(val)))
+    elif op == "ends_with":
+        return isinstance(actual, str) and normalize(actual).endswith(normalize(str(val)))
+    else:
+        return False
+
+
+def _eval_condition_node(node, facts: FileFacts) -> bool:
+    if isinstance(node, list):
+        if not node:
+            return True
+        for item in node:
+            if not _eval_condition_node(item, facts):
+                return False
+        return True
+
+    if isinstance(node, dict):
+        if "any" in node and isinstance(node["any"], list):
+            sub_conds = node["any"]
+            if not sub_conds:
+                return True
+            return any(_eval_condition_node(sub, facts) for sub in sub_conds)
+
+        if "all" in node and isinstance(node["all"], list):
+            sub_conds = node["all"]
+            if not sub_conds:
+                return True
+            return all(_eval_condition_node(sub, facts) for sub in sub_conds)
+
+        op = node.get("operator")
+        if op in ("any", "or") and "conditions" in node and isinstance(node.get("conditions"), list):
+            sub_conds = node["conditions"]
+            if not sub_conds:
+                return True
+            return any(_eval_condition_node(sub, facts) for sub in sub_conds)
+        elif op in ("all", "and") and "conditions" in node and isinstance(node.get("conditions"), list):
+            sub_conds = node["conditions"]
+            if not sub_conds:
+                return True
+            return all(_eval_condition_node(sub, facts) for sub in sub_conds)
+
+        return _eval_leaf_condition(node, facts)
+
+    return False
+
+
+def check_conditions(path: Path, ext: str, conditions_str: str | list | dict | None,
+                     facts: FileFacts | None = None) -> bool:
+    """Evalua las condiciones de una regla. Admite listas (AND), grupos
+    {"operator": "any", "conditions": [...]} o {"any": [...]} (OR), y combinaciones
+    anidadas. Si un campo no se puede obtener, la regla no casa."""
+    if not conditions_str:
+        return True
+
+    if isinstance(conditions_str, (list, dict)):
+        conditions = conditions_str
+    elif isinstance(conditions_str, str):
+        c_str = conditions_str.strip()
+        if not c_str:
+            return True
+        try:
+            conditions = json.loads(c_str)
+        except Exception:
+            return False
+    else:
+        return False
+
+    if not isinstance(conditions, (list, dict)):
         return False
 
     if facts is None:
         facts = FileFacts(path, ext)
 
-    for cond in conditions:
-        if not isinstance(cond, dict):
-            return False
-        field = cond.get("field")
-        op = cond.get("operator")
-        val = cond.get("value")
-        if not field or not op:
-            continue
+    return _eval_condition_node(conditions, facts)
 
-        actual = facts.value_for(field)
-        if actual is _UNAVAILABLE or actual is None:
-            return False
-
-        if op in ("gt", ">", "lt", "<", "gte", ">=", "lte", "<="):
-            if _compare_numeric(actual, val, op) is not True:
-                return False
-        elif op in ("equals", "=="):
-            numeric = _compare_numeric(actual, val, op)
-            if numeric is None:
-                if normalize(str(actual)) != normalize(str(val)):
-                    return False
-            elif not numeric:
-                return False
-        elif op == "contains":
-            if not isinstance(actual, str) or normalize(val) not in normalize(actual):
-                return False
-        elif op == "not_contains":
-            if not isinstance(actual, str) or normalize(val) in normalize(actual):
-                return False
-        elif op == "starts_with":
-            if not isinstance(actual, str) or not normalize(actual).startswith(normalize(val)):
-                return False
-        elif op == "ends_with":
-            if not isinstance(actual, str) or not normalize(actual).endswith(normalize(val)):
-                return False
-        else:
-            # operador desconocido: no se puede afirmar que la regla case
-            return False
-    return True
 
 
 def format_rename_pattern(pattern: str, path: Path, category: str, topic_name: str | None) -> str:
@@ -1190,6 +1233,27 @@ def undo_move(move_id: int) -> tuple[dict | None, str | None]:
         "source": move["destination"],
         "destination": str(final_orig),
     }, None
+
+
+def batch_undo_moves(move_ids: list[int]) -> dict:
+    """Deshace un conjunto de movimientos por sus IDs.
+    Retorna {"success_count": int, "failed_count": int, "results": list[dict]}."""
+    results = []
+    success_count = 0
+    failed_count = 0
+    for mid in move_ids:
+        res, error = undo_move(mid)
+        if error:
+            failed_count += 1
+            results.append({"id": mid, "success": False, "error": error})
+        else:
+            success_count += 1
+            results.append({"id": mid, "success": True, "details": res})
+    return {
+        "success_count": success_count,
+        "failed_count": failed_count,
+        "results": results,
+    }
 
 
 def run_maintenance_cleanup() -> list[dict]:

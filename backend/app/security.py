@@ -129,8 +129,97 @@ MAX_CONDITIONS_PER_RULE = 20
 MAX_CONDITION_VALUE_CHARS = 500
 
 
+_VALID_GROUP_OPERATORS = {"any", "all", "or", "and"}
+
+
+def _clean_leaf_condition(cond: dict) -> dict | None:
+    if not isinstance(cond, dict):
+        return None
+    field = cond.get("field")
+    operator = cond.get("operator")
+    value = cond.get("value")
+    if field not in _VALID_CONDITION_FIELDS or operator not in _VALID_CONDITION_OPERATORS:
+        return None
+    # bool es subclase de int en Python: se descarta explicitamente para
+    # que un true/false del JSON no acabe comparandose como 1/0.
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return None
+    if isinstance(value, str):
+        if len(value) > MAX_CONDITION_VALUE_CHARS or "\x00" in value:
+            return None
+    if field in _NUMERIC_CONDITION_FIELDS:
+        try:
+            float(value)
+        except (TypeError, ValueError):
+            return None
+    return {"field": field, "operator": operator, "value": value}
+
+
+def _clean_condition_node(node, depth=0):
+    if depth > 10:
+        return None
+
+    if isinstance(node, list):
+        cleaned = []
+        for item in node:
+            c = _clean_condition_node(item, depth + 1)
+            if c is None:
+                return None
+            cleaned.append(c)
+        return cleaned
+
+    if isinstance(node, dict):
+        if "any" in node and isinstance(node["any"], list):
+            cleaned_subs = []
+            for item in node["any"]:
+                c = _clean_condition_node(item, depth + 1)
+                if c is None:
+                    return None
+                cleaned_subs.append(c)
+            return {"any": cleaned_subs}
+
+        if "all" in node and isinstance(node["all"], list):
+            cleaned_subs = []
+            for item in node["all"]:
+                c = _clean_condition_node(item, depth + 1)
+                if c is None:
+                    return None
+                cleaned_subs.append(c)
+            return {"all": cleaned_subs}
+
+        op = node.get("operator")
+        if op in _VALID_GROUP_OPERATORS and "conditions" in node and isinstance(node.get("conditions"), list):
+            norm_op = "any" if op in ("any", "or") else "all"
+            cleaned_subs = []
+            for item in node["conditions"]:
+                c = _clean_condition_node(item, depth + 1)
+                if c is None:
+                    return None
+                cleaned_subs.append(c)
+            return {"operator": norm_op, "conditions": cleaned_subs}
+
+        return _clean_leaf_condition(node)
+
+    return None
+
+
+def _count_leaves(node) -> int:
+    if isinstance(node, list):
+        return sum(_count_leaves(item) for item in node)
+    if isinstance(node, dict):
+        if "any" in node and isinstance(node["any"], list):
+            return sum(_count_leaves(item) for item in node["any"])
+        if "all" in node and isinstance(node["all"], list):
+            return sum(_count_leaves(item) for item in node["all"])
+        if "conditions" in node and isinstance(node["conditions"], list):
+            return sum(_count_leaves(item) for item in node["conditions"])
+        if "field" in node:
+            return 1
+    return 0
+
+
 def valid_conditions(raw) -> str | None:
-    """Valida y normaliza la lista de condiciones de una regla (ya sea un
+    """Valida y normaliza la lista u objeto de condiciones de una regla (ya sea un
     JSON string o una lista/objeto ya parseado). Devuelve el JSON normalizado
     o None si el formato o alguno de sus campos/operadores no es valido."""
     import json
@@ -145,33 +234,20 @@ def valid_conditions(raw) -> str | None:
             raw = json.loads(raw)
         except Exception:
             return None
-    if not isinstance(raw, list) or len(raw) > MAX_CONDITIONS_PER_RULE:
+
+    if not isinstance(raw, (list, dict)):
         return None
 
-    cleaned = []
-    for cond in raw:
-        if not isinstance(cond, dict):
-            return None
-        field = cond.get("field")
-        operator = cond.get("operator")
-        value = cond.get("value")
-        if field not in _VALID_CONDITION_FIELDS or operator not in _VALID_CONDITION_OPERATORS:
-            return None
-        # bool es subclase de int en Python: se descarta explicitamente para
-        # que un true/false del JSON no acabe comparandose como 1/0.
-        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
-            return None
-        if isinstance(value, str):
-            if len(value) > MAX_CONDITION_VALUE_CHARS or "\x00" in value:
-                return None
-        if field in _NUMERIC_CONDITION_FIELDS:
-            try:
-                float(value)
-            except (TypeError, ValueError):
-                return None
-        cleaned.append({"field": field, "operator": operator, "value": value})
+    cleaned = _clean_condition_node(raw)
+    if cleaned is None:
+        return None
 
-    return json.dumps(cleaned) if cleaned else None
+    leaf_count = _count_leaves(cleaned)
+    if leaf_count == 0 or leaf_count > MAX_CONDITIONS_PER_RULE:
+        return None
+
+    return json.dumps(cleaned)
+
 
 
 # ---- rutas que Martix nunca debe mover ni borrar ----------------------------

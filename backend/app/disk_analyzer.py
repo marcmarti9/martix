@@ -132,16 +132,25 @@ def _hsl_to_hex(h: float, s: float, l: float) -> str:
     return f"#{ri:02x}{gi:02x}{bi:02x}"
 
 
+_EXT_INFO_CACHE: Dict[str, Tuple[str, str]] = {}
+
+
 def get_extension_info(ext: str) -> Tuple[str, str]:
     ext_clean = ext.lower().strip().lstrip(".")
     if not ext_clean:
         return "(Sin extensión)", "#64748b"
+    cached = _EXT_INFO_CACHE.get(ext_clean)
+    if cached is not None:
+        return cached
     if ext_clean in EXTENSION_CATEGORIES:
-        return EXTENSION_CATEGORIES[ext_clean]
-    # Generar color HSL determinista para cualquier extensión no listada
-    h = sum(ord(ch) for ch in ext_clean) * 47 % 360
-    color_hex = _hsl_to_hex(h, 0.65, 0.55)
-    return f"Archivo .{ext_clean.upper()}", color_hex
+        res = EXTENSION_CATEGORIES[ext_clean]
+    else:
+        # Generar color HSL determinista para cualquier extensión no listada
+        h = sum(ord(ch) for ch in ext_clean) * 47 % 360
+        color_hex = _hsl_to_hex(h, 0.65, 0.55)
+        res = (f"Archivo .{ext_clean.upper()}", color_hex)
+    _EXT_INFO_CACHE[ext_clean] = res
+    return res
 
 
 def format_bytes(bytes_num: int) -> str:
@@ -268,8 +277,13 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6,
                     _record_extension(entry.name, st.st_size)
         return total_size, files, folders, latest
 
+    def _get_ext_clean(filename: str) -> str:
+        if "." in filename and not filename.startswith("."):
+            return filename.rsplit(".", 1)[-1].lower()
+        return ""
+
     def _record_extension(name: str, size: int) -> None:
-        ext = Path(name).suffix.lower().lstrip(".")
+        ext = _get_ext_clean(name)
         ext_key = f".{ext}" if ext else "(Sin extensión)"
         bucket = extension_map.get(ext_key)
         if bucket is None:
@@ -339,7 +353,7 @@ def scan_disk_usage(root_path: Path, max_depth: int = 6,
                 f_size = stat.st_size
                 node_size += f_size
 
-                ext = Path(entry.name).suffix.lower().lstrip(".")
+                ext = _get_ext_clean(entry.name)
                 ext_key = f".{ext}" if ext else "(Sin extensión)"
                 type_name, color = get_extension_info(ext)
                 _record_extension(entry.name, f_size)

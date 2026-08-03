@@ -11,14 +11,27 @@ from app import db
 from config.settings import DOWNLOADS_DIR, HOME_DIR, load_categories
 
 
-def _path_to_key(resolved: Path) -> str:
+_cached_home_dir: Path | None = None
+_cached_home_resolved: Path | None = None
+
+
+def _get_home_resolved() -> Path:
+    global _cached_home_dir, _cached_home_resolved
+    if _cached_home_dir is not HOME_DIR:
+        _cached_home_dir = HOME_DIR
+        _cached_home_resolved = HOME_DIR.resolve()
+    return _cached_home_resolved
+
+
+def _path_to_key(resolved: Path | str) -> str:
     """Convierte una ruta absoluta en algo relativo a la carpeta personal
     cuando es posible (mas legible y portable), o en la ruta absoluta si
     queda fuera (p.ej. una carpeta de Descargas personalizada)."""
+    p = Path(resolved) if isinstance(resolved, str) else resolved
     try:
-        return str(resolved.relative_to(HOME_DIR.resolve())).replace("\\", "/")
+        return str(p.relative_to(_get_home_resolved())).replace("\\", "/")
     except ValueError:
-        return str(resolved)
+        return str(p).replace("\\", "/")
 
 
 def resolve_safe_path(raw_path: str) -> Path | None:
