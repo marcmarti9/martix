@@ -186,9 +186,11 @@ def _choose_model(models: list[str], requested: str) -> str | None:
     return models[0]
 
 
-def _update_state(**changes) -> dict:
+def _update_state(base_dict: dict | None = None, **changes) -> dict:
     global LLM_ENABLED, LLM_MODEL
     with _state_lock:
+        if base_dict:
+            _state.update(base_dict)
         _state.update(changes)
         LLM_ENABLED = bool(_state["enabled"])
         LLM_MODEL = str(_state["model"] or _settings.LLM_MODEL)
@@ -219,17 +221,17 @@ def initialize(force: bool = False) -> dict:
         }
 
         if not explicit and not LLM_AUTO:
-            return _update_state(**base, reason="Desactivado desde la configuración local.")
+            return _update_state(base, reason="Desactivado desde la configuración local.")
 
         from app.security import is_loopback_url
         if not is_loopback_url(LLM_URL):
             return _update_state(
-                **base,
+                base,
                 reason="La dirección de Ollama no es local; Martix no enviará archivos fuera del equipo.",
             )
 
         if LLM_AUTO and not explicit and not hardware_ok:
-            return _update_state(**base, reason=hardware_reason)
+            return _update_state(base, reason=hardware_reason)
 
         probe_error = None
         try:
@@ -251,7 +253,7 @@ def initialize(force: bool = False) -> dict:
 
             if not models:
                 return _update_state(
-                    **base,
+                    base,
                     reason=(
                         "Ollama local no está disponible; se usa el modo heurístico."
                         if not _ollama_executable()
@@ -263,14 +265,14 @@ def initialize(force: bool = False) -> dict:
         selected = _choose_model(models, str(_settings.LLM_MODEL))
         if not selected:
             return _update_state(
-                **base,
+                base,
                 available=True,
                 models=models,
                 reason="Ollama responde, pero no tiene ningún modelo local descargado.",
             )
 
         return _update_state(
-            **base,
+            base,
             enabled=True,
             available=True,
             model=selected,

@@ -26,7 +26,8 @@ sys.path.insert(0, str(BACKEND))
 from config import settings  # noqa: E402
 
 FAKE_HOME = Path(_tmp).resolve()
-assert settings.HOME_DIR.resolve() == FAKE_HOME
+settings.HOME_DIR = FAKE_HOME
+settings.DOWNLOADS_DIR = FAKE_HOME / "Downloads"
 
 from app import db  # noqa: E402
 db.DB_PATH = FAKE_HOME / "probe.db"
