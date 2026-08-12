@@ -5,15 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none';">
     <title>Martix — Explorador de archivos</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="desktop-scene" aria-hidden="true"></div>
     <div id="app">
         <header id="toolbar" class="app-header">
             <div id="toolbar-brand" class="brand-lockup">
                 <div class="brand-logo" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3.2" y="4.2" width="8.2" height="11.2" rx="1.8"/>
+                        <rect x="12.6" y="8.4" width="8.2" height="11.4" rx="1.8"/>
+                        <path d="M5.6 8h3.2M5.6 11h3.2M15 12.2h3.2M15 15.2h3.2"/>
                     </svg>
                 </div>
                 <div>
@@ -27,8 +31,8 @@
             </div>
 
             <div id="toolbar-actions" class="header-actions">
-                <label class="auto-organize-control" data-i18n-title="patrol_title" title="Organización automática de Descargas en tiempo real">
-                    <span class="toolbar-label" data-i18n="patrol_label">Auto-organizar</span>
+                <label class="auto-organize-control" data-i18n-title="patrol_title" title="Clasifica Descargas en cuanto terminan">
+                    <span class="toolbar-label" data-i18n="patrol_label">En vivo</span>
                     <input type="checkbox" id="patrol-toggle">
                     <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
                 </label>
@@ -67,7 +71,9 @@
                     <span class="sr-only" data-i18n="help_btn">Ayuda</span>
                 </button>
                 <button type="button" id="btn-settings" class="btn btn-settings" data-i18n-title="settings_title" title="Ajustes y reglas">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19 13 1.4 1.1-1.7 2.9-1.7-.7a7.5 7.5 0 0 1-1.4.8l-.3 1.8h-3.4l-.3-1.8a7.5 7.5 0 0 1-1.4-.8l-1.7.7-1.7-2.9L8 13a7 7 0 0 1 0-1.9l-1.4-1.2 1.7-2.8 1.7.7a7.5 7.5 0 0 1 1.4-.8l.3-1.8h3.4l.3 1.8a7.5 7.5 0 0 1 1.4.8l1.7-.7 1.7 2.8-1.4 1.2A7 7 0 0 1 19 13Z"/></svg>
+                    <span id="settings-btn-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19 13 1.4 1.1-1.7 2.9-1.7-.7a7.5 7.5 0 0 1-1.4.8l-.3 1.8h-3.4l-.3-1.8a7.5 7.5 0 0 1-1.4-.8l-1.7.7-1.7-2.9L8 13a7 7 0 0 1 0-1.9l-1.4-1.2 1.7-2.8 1.7.7a7.5 7.5 0 0 1 1.4-.8l.3-1.8h3.4l.3 1.8a7.5 7.5 0 0 1 1.4.8l1.7-.7 1.7 2.8-1.4 1.2A7 7 0 0 1 19 13Z"/></svg>
+                    </span>
                     <span data-i18n="settings_btn">Ajustes</span>
                 </button>
             </div>
@@ -81,15 +87,6 @@
                 </div>
                 <ul id="folder-tree" class="folder-tree" aria-label="Carpetas"></ul>
                 <div class="sidebar-spacer"></div>
-                <div class="privacy-card">
-                    <div class="privacy-card-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 19 6v5c0 4.5-2.8 8.1-7 10-4.2-1.9-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
-                    </div>
-                    <div>
-                        <strong>Solo en este equipo</strong>
-                        <span>Sin nube ni telemetría</span>
-                    </div>
-                </div>
                 <div class="sidebar-metric">
                     <span data-i18n="organized_count_prefix">Archivos organizados</span>
                     <strong id="files-organized-count">0</strong>
@@ -104,7 +101,7 @@
                         <p id="content-description" class="content-description" data-i18n="content_description">Tus carpetas importantes, en un solo lugar.</p>
                     </div>
                     <div class="content-toolbar-meta">
-                        <span id="patrol-status-pill" class="status-pill"><span id="patrol-status-text">Pausa / Desactivado</span></span>
+                        <span id="patrol-status-pill" class="status-pill inactive"><span class="dot" aria-hidden="true"></span><span id="patrol-status-text">En pausa</span></span>
                     </div>
                 </div>
 
@@ -172,10 +169,10 @@
             </div>
             <div class="onboard-slide" data-slide="4" hidden>
                 <div class="slide-illustration"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v5h5"/><path d="M12 8v4l3 2"/></svg></div>
-                <h3 data-i18n="slide4_title">Tú decides sobre la limpieza</h3><p>Los instaladores se sugieren para revisión; el borrado automático solo funciona si lo activas expresamente.</p>
+                <h3 data-i18n="slide4_title">Tú decides sobre la limpieza</h3><p data-i18n="slide4_desc">Los instaladores se sugieren para revisión; el borrado automático solo funciona si lo activas expresamente.</p>
             </div>
         </div>
-        <div class="onboarding-footer"><span id="onboard-step-badge" class="step-badge">Paso 1 de 4</span><div><button type="button" id="btn-onboard-prev" class="btn btn-quiet">Atrás</button><button type="button" id="btn-onboard-next" class="btn btn-primary">Siguiente</button><button type="button" id="btn-onboard-finish" class="btn btn-primary" hidden>Empezar</button></div></div>
+        <div class="onboarding-footer"><span id="onboard-step-badge" class="step-badge">Paso 1 de 4</span><div><button type="button" id="btn-onboard-prev" class="btn btn-quiet" data-i18n="btn_prev">Atrás</button><button type="button" id="btn-onboard-next" class="btn btn-primary" data-i18n="btn_next">Siguiente</button><button type="button" id="btn-onboard-finish" class="btn btn-primary" hidden data-i18n="btn_start">Empezar</button></div></div>
     </dialog>
 
     <dialog id="disk-analyzer-modal" class="modal-dialog modal-full">

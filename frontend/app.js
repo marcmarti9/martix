@@ -9,8 +9,8 @@
 
 const TRANSLATIONS = {
     es: {
-        patrol_label: "Auto-Organizar",
-        patrol_title: "Organización automática de Descargas en tiempo real",
+        patrol_label: "En vivo",
+        patrol_title: "Clasifica Descargas en cuanto terminan",
         organize_btn: "Organizar ahora",
         settings_title: "Ajustes",
         organized_count_prefix: "Archivos organizados",
@@ -42,7 +42,13 @@ const TRANSLATIONS = {
         cleanup_deleted: "Archivo enviado a la papelera.",
         cleanup_dismissed: "Sugerencia descartada.",
         cleanup_empty: "No hay sugerencias pendientes.",
-        tab_ai: "🤖 IA Local (Ollama)",
+        tab_ai: "IA local",
+        files_suffix: "archivos",
+        simulate_modal_hint: "Nada se mueve hasta que pulses Organizar ahora.",
+        privacy_title: "Solo en este equipo",
+        privacy_caption: "Sin nube ni telemetría",
+        trash_load_error: "No se pudo cargar la papelera.",
+        disk_analyzer_title: "Uso del espacio",
         ai_hint: "Martix detecta Ollama local automáticamente cuando el equipo puede usarlo; tus archivos no salen a la nube.",
         ai_status_enabled: "Ollama activado (modo LLM)",
         ai_status_disabled: "Ollama desactivado (modo heurístico)",
@@ -111,9 +117,9 @@ const TRANSLATIONS = {
         data: "Datos",
         
         status_conn_error: "No se pudo contactar con Martix.",
-        status_patrol_active: "Patrulla activa: vigilando Descargas.",
-        status_patrol_inactive: "Patrulla desactivada.",
-        status_patrol_error: "No se pudo cambiar la Patrulla Activa.",
+        status_patrol_active: "Clasificación en vivo: Descargas.",
+        status_patrol_inactive: "Clasificación en vivo en pausa.",
+        status_patrol_error: "No se pudo cambiar la clasificación en vivo.",
         status_organizing: "Organizando...",
         status_organized_done: "Listo: {moved} archivo(s) organizado(s); {review} para revisar.",
         status_organize_error: "Fallo al organizar la carpeta de descargas.",
@@ -228,8 +234,8 @@ const TRANSLATIONS = {
         stats_load_error: "No se pudieron cargar las estadísticas.",
 
         // Toolbar & Header
-        patrol_on: "REC / Vigilando",
-        patrol_off: "Pausa / Desactivado",
+        patrol_on: "En vivo",
+        patrol_off: "En pausa",
         organize_title: "Organizar archivos de descargas y carpetas vigiladas inmediatamente",
         simulate_btn: "Simular (Prueba)",
         simulate_title: "Prueba tus reglas sin mover ningún archivo real",
@@ -258,11 +264,11 @@ const TRANSLATIONS = {
         slide2_desc: "Martix vigila tu carpeta de Descargas y carpetas vigiladas. Cuando termina una descarga (.crdownload / .part), la clasifica y la traslada a su sitio en segundos.",
         slide3_title: "Reglas Scratch, OCR e IA Local",
         slide3_desc: "Define reglas por extensión, nombre, tamaño o días. Martix lee texto dentro de PDFs/imágenes (OCR) y metadatos EXIF/ID3. ¡Usa Ollama local si quieres!",
-        slide4_title: "Deduplicación y Smart Learning",
-        slide4_desc: "Encuentra y limpia duplicados con el análisis ultra-rápido de 2 pasos. Si corriges manualmente la ubicación de un archivo en el Historial, ¡Martix aprenderá y te sugerirá una regla!",
-        btn_prev: "⬅️ Anterior",
-        btn_next: "Siguiente ➔",
-        btn_start: "🚀 ¡Empezar a usar Martix!",
+        slide4_title: "Tú decides sobre la limpieza",
+        slide4_desc: "Los instaladores se sugieren para revisión. El envío automático a la papelera solo ocurre si lo activas tú.",
+        btn_prev: "Anterior",
+        btn_next: "Siguiente",
+        btn_start: "Empezar",
 
         // Disk Space Analyzer
         disk_analyzer_btn: "Analizador de Espacio",
@@ -301,18 +307,18 @@ const TRANSLATIONS = {
         disk_analyzer_no_selection: "Ningún elemento seleccionado",
         disk_analyzer_selected: "Seleccionado",
         disk_analyzer_delete_btn: "Eliminar Elemento",
-        disk_analyzer_confirm_delete: "¿Estás seguro de que deseas eliminar permanentemente:\n\n{path}?",
+        disk_analyzer_confirm_delete: "¿Enviar este elemento a la papelera?\n\n{path}",
         disk_analyzer_close_btn: "Cerrar",
 
         // Updates
-        update_available_btn: "🚀 Actualización disponible",
+        update_available_btn: "Actualización disponible",
         update_available_title: "Existe una nueva versión de Martix en el repositorio. Haz clic para actualizar.",
         update_confirm_dialog: "¿Deseas actualizar Martix a la última versión disponible desde GitHub?",
         status_updating: "Actualizando Martix en segundo plano..."
     },
     en: {
-        patrol_label: "Active Patrol",
-        patrol_title: "Watch Downloads in real time",
+        patrol_label: "Live sort",
+        patrol_title: "File new downloads as they finish",
         organize_btn: "Organize now",
         settings_title: "Settings & Rules",
         organized_count_prefix: "Organized files",
@@ -323,8 +329,8 @@ const TRANSLATIONS = {
         tab_rules: "Rules by Extension",
 
         // Toolbar & Header
-        patrol_on: "REC / Watching",
-        patrol_off: "Paused / Off",
+        patrol_on: "Live",
+        patrol_off: "Paused",
         organize_title: "Organize downloads and watched folders immediately",
         simulate_btn: "Simulate (Test)",
         simulate_title: "Test your rules without moving any real files",
@@ -349,15 +355,15 @@ const TRANSLATIONS = {
         welcome_sub: "Your intelligent, 100% local and private file organizer.",
         slide1_title: "100% Local & Private",
         slide1_desc: "Your documents, invoices, and photos never leave your machine. No cloud, no tracking, and no internet data calls.",
-        slide2_title: "Real-Time Active Patrol",
+        slide2_title: "Live sorting",
         slide2_desc: "Martix watches your Downloads and custom folders. Once a download finishes (.crdownload / .part), it automatically files it in its target destination.",
         slide3_title: "Scratch Rules, OCR & Metadata",
         slide3_desc: "Define visual rules combining extension, keywords, age (days), image OCR scanning, and EXIF/ID3 metadata tags. Connect local Ollama AI whenever needed.",
-        slide4_title: "Deduplication & Smart Learning",
-        slide4_desc: "Find and clean duplicates instantly with 2-step fast hashing. If you manually correct a file placement, Martix learns and suggests a new rule!",
-        btn_prev: "⬅️ Previous",
-        btn_next: "Next ➔",
-        btn_start: "🚀 Start using Martix!",
+        slide4_title: "You decide what gets cleaned",
+        slide4_desc: "Installers are suggested for review. Automatic trash only runs if you turn it on.",
+        btn_prev: "Previous",
+        btn_next: "Next",
+        btn_start: "Get started",
 
         // Disk Space Analyzer
         disk_analyzer_btn: "Disk Space Analyzer",
@@ -396,11 +402,11 @@ const TRANSLATIONS = {
         disk_analyzer_no_selection: "No item selected",
         disk_analyzer_selected: "Selected",
         disk_analyzer_delete_btn: "Delete Item",
-        disk_analyzer_confirm_delete: "Are you sure you want to permanently delete:\n\n{path}?",
+        disk_analyzer_confirm_delete: "Send this item to the trash?\n\n{path}",
         disk_analyzer_close_btn: "Close",
 
         // Updates
-        update_available_btn: "🚀 Update available",
+        update_available_btn: "Update available",
         update_available_title: "A new version of Martix is available. Click to update.",
         update_confirm_dialog: "Do you want to update Martix to the latest version from GitHub?",
         status_updating: "Updating Martix in the background...",
@@ -428,7 +434,13 @@ const TRANSLATIONS = {
         cleanup_deleted: "File sent to the trash.",
         cleanup_dismissed: "Suggestion dismissed.",
         cleanup_empty: "No pending suggestions.",
-        tab_ai: "🤖 Local AI (Ollama)",
+        tab_ai: "Local AI",
+        files_suffix: "files",
+        simulate_modal_hint: "Nothing moves until you click Organize now.",
+        privacy_title: "Only on this computer",
+        privacy_caption: "No cloud, no telemetry",
+        trash_load_error: "Could not load the trash.",
+        disk_analyzer_title: "Disk usage",
         ai_hint: "Martix detects local Ollama automatically when the computer can run it; your files never go to the cloud.",
         ai_status_enabled: "Ollama enabled (LLM mode)",
         ai_status_disabled: "Ollama disabled (heuristic mode)",
@@ -496,10 +508,10 @@ const TRANSLATIONS = {
         fonts: "Fonts",
         data: "Data",
         
-        status_conn_error: "Could not connect to Sortix.",
-        status_patrol_active: "Patrol active: watching Downloads.",
-        status_patrol_inactive: "Patrol deactivated.",
-        status_patrol_error: "Could not toggle Active Patrol.",
+        status_conn_error: "Could not connect to Martix.",
+        status_patrol_active: "Live sort is on: Downloads.",
+        status_patrol_inactive: "Live sort is paused.",
+        status_patrol_error: "Could not change live sort.",
         status_organizing: "Organizing...",
         status_organized_done: "Done: {moved} file(s) organized; {review} need review.",
         status_organize_error: "Failed to organize downloads folder.",
@@ -515,11 +527,11 @@ const TRANSLATIONS = {
         status_rule_save_error: "Could not save rule.",
         theme_title: "Toggle theme",
         
-        welcome_message: "Welcome: define your first Topics (bank, gym, apps...) and that's it, Sortix takes care of the rest.",
+        welcome_message: "Welcome: define your first Topics (bank, gym, apps...) and that's it, Martix takes care of the rest.",
         
         tab_history: "History",
-        history_hint: "Recent Sortix movements. If a file ended up in the wrong place, click 'Undo' to return it to its source folder.",
-        history_empty: "Sortix has not moved any files yet.",
+        history_hint: "Recent Martix movements. If a file ended up in the wrong place, click Undo to return it to its source folder.",
+        history_empty: "Martix has not moved any files yet.",
         history_load_error: "Could not load history.",
         undo_title: "Undo: return the file to its source folder",
         status_undone_done: '"{filename}" returned to its source folder.',
@@ -592,7 +604,7 @@ const TRANSLATIONS = {
 
         // Watched folders
         tab_watched: "Watched Folders",
-        watched_hint: "Add additional folders that Sortix will organize when you click \"Organize now\".",
+        watched_hint: "Add additional folders that Martix will organize when you click \"Organize now\".",
         watched_folder_label: "Folder path",
         watched_folder_placeholder: "e.g. /home/user/Desktop",
         add_watched_btn: "Add folder",
@@ -605,7 +617,7 @@ const TRANSLATIONS = {
 
         // Statistics
         tab_stats: "Statistics",
-        stats_hint: "Summary of Sortix activity.",
+        stats_hint: "Summary of Martix activity.",
         stats_total_label: "total files organized",
         stats_top_categories: "Top Categories",
         stats_activity_title: "Activity (last 30 days)",
@@ -623,7 +635,7 @@ const TRANSLATIONS = {
         close_title: "关闭",
         tab_topics: "主题",
         tab_rules: "扩展名规则",
-        tab_ai: "🤖 本地 AI (Ollama)",
+        tab_ai: "本地 AI",
         home: "首页",
         downloads: "下载",
         images: "图片",
@@ -658,7 +670,7 @@ const TRANSLATIONS = {
         close_title: "बंद करें",
         tab_topics: "विषय",
         tab_rules: "एक्सटेंशन नियम",
-        tab_ai: "🤖 लोकल AI (Ollama)",
+        tab_ai: "लोकल AI",
         home: "होम",
         downloads: "डाउनलोड",
         images: "चित्र",
@@ -693,7 +705,7 @@ const TRANSLATIONS = {
         close_title: "Fermer",
         tab_topics: "Thèmes",
         tab_rules: "Règles par extension",
-        tab_ai: "🤖 IA Locale (Ollama)",
+        tab_ai: "IA locale",
         home: "Accueil",
         downloads: "Téléchargements",
         images: "Images",
@@ -728,7 +740,7 @@ const TRANSLATIONS = {
         close_title: "Schließen",
         tab_topics: "Themen",
         tab_rules: "Regeln nach Erweiterung",
-        tab_ai: "🤖 Lokale KI (Ollama)",
+        tab_ai: "Lokale KI",
         home: "Startseite",
         downloads: "Downloads",
         images: "Bilder",
@@ -901,6 +913,10 @@ function formatSize(bytes) {
     return `${value.toFixed(1)} ${units[i]}`;
 }
 
+function formatBytes(bytes) {
+    return formatSize(bytes);
+}
+
 // ---- estado ------------------------------------------------------------
 
 let tree = [];
@@ -1036,16 +1052,22 @@ function renderSidebar() {
     folderTreeEl.innerHTML = "";
 
     const homeItem = document.createElement("li");
-    homeItem.className = "tree-item" + (currentPath === null ? " active" : "");
-    homeItem.innerHTML = `${svgIcon("home")}<span>${t("home", "Inicio")}</span>`;
-    homeItem.addEventListener("click", () => navigateTo(null));
+    const homeBtn = document.createElement("button");
+    homeBtn.type = "button";
+    homeBtn.className = "tree-item" + (currentPath === null ? " active" : "");
+    homeBtn.innerHTML = `${svgIcon("home")}<span>${t("home", "Inicio")}</span>`;
+    homeBtn.addEventListener("click", () => navigateTo(null));
+    homeItem.appendChild(homeBtn);
     folderTreeEl.appendChild(homeItem);
 
     for (const item of tree) {
         const li = document.createElement("li");
-        li.className = "tree-item" + (currentPath === item.path ? " active" : "");
-        li.innerHTML = `${svgIcon(item.icon)}<span>${escapeHtml(t(item.key, item.label))}</span>`;
-        li.addEventListener("click", () => navigateTo(item.path));
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tree-item" + (currentPath === item.path ? " active" : "");
+        btn.innerHTML = `${svgIcon(item.icon)}<span>${escapeHtml(t(item.key, item.label))}</span>`;
+        btn.addEventListener("click", () => navigateTo(item.path));
+        li.appendChild(btn);
         folderTreeEl.appendChild(li);
     }
 }
@@ -1168,7 +1190,8 @@ async function renderContent() {
 function renderRootTiles() {
     fileGridEl.innerHTML = "";
     for (const item of tree) {
-        const card = document.createElement("div");
+        const card = document.createElement("button");
+        card.type = "button";
         card.className = "category-card";
         card.innerHTML = `
             <span class="category-card-icon">${svgIcon(item.icon)}</span>
@@ -1184,8 +1207,9 @@ function renderRootTiles() {
 }
 
 function buildTile(entry) {
-    const tile = document.createElement("div");
+    const tile = document.createElement(entry.is_dir ? "button" : "div");
     if (entry.is_dir) {
+        tile.type = "button";
         tile.className = "tile folder-tile";
         tile.innerHTML = `
             <span class="tile-leading">${svgIcon("folder", "tile-icon")}</span>
@@ -1321,7 +1345,7 @@ function showSimulateResultsLegacy(data) {
     } else {
         container.innerHTML = previewRows.slice(0, maxPreviewRows).map(item => `
             <div class="simulation-row ${item.status === "review" ? "review" : ""}">
-                <span class="simulate-file">📄 ${escapeHtml(item.filename || item.file)}</span>
+                <span class="simulate-file">${escapeHtml(item.filename || item.file)}</span>
                 <span aria-hidden="true">→</span>
                 <span class="simulate-target">${escapeHtml(item.would_move_to || item.destination || "Se queda para revisión")}</span>
             </div>
@@ -1386,7 +1410,7 @@ function renderSimulationPage() {
             const rowClass = isReview ? "review" : (isSkipped ? "skipped" : "");
             return `
                 <div class="simulation-row ${rowClass}">
-                    <span class="simulate-file">📄 ${escapeHtml(item.filename || item.file)}</span>
+                    <span class="simulate-file">${escapeHtml(item.filename || item.file)}</span>
                     <span aria-hidden="true">→</span>
                     <span class="simulate-target">${escapeHtml(target)}</span>
                 </div>
@@ -1882,7 +1906,7 @@ async function refreshTrash() {
     try {
         data = await fetchJSON("/api/trash");
     } catch (err) {
-        trashListEl.innerHTML = `<li class="empty">${t("status_import_error")}</li>`;
+        trashListEl.innerHTML = `<li class="empty">${t("trash_load_error")}</li>`;
         return;
     }
 
@@ -2435,8 +2459,10 @@ async function cleanSelectedDuplicates() {
 
 // ---- modal de ajustes --------------------------------------------------------
 
-document.getElementById("btn-settings").innerHTML = svgIcon("settings");
-document.getElementById("btn-close-settings").innerHTML = svgIcon("close");
+const settingsBtnIcon = document.getElementById("settings-btn-icon");
+if (settingsBtnIcon) settingsBtnIcon.innerHTML = svgIcon("settings");
+const closeSettingsBtn = document.getElementById("btn-close-settings");
+if (closeSettingsBtn) closeSettingsBtn.innerHTML = svgIcon("close");
 
 document.getElementById("btn-settings").addEventListener("click", () => openSettings());
 document.getElementById("btn-close-settings").addEventListener("click", () => settingsModal.close());
@@ -2458,7 +2484,6 @@ for (const tabBtn of document.querySelectorAll(".tab-btn")) {
         document.getElementById(`tab-${tabBtn.dataset.tab}`).hidden = false;
         if (tabBtn.dataset.tab === "history") refreshHistory();
         if (tabBtn.dataset.tab === "general") refreshGeneralSettings();
-        if (tabBtn.dataset.tab === "duplicates") scanDuplicates();
         if (tabBtn.dataset.tab === "maintenance") refreshMaintenance();
         if (tabBtn.dataset.tab === "trash") refreshTrash();
         if (tabBtn.dataset.tab === "watched") refreshWatchedFolders();
@@ -2753,7 +2778,7 @@ function renderDiskAnalyzerSummary() {
         // El backend acota el escaneo por tiempo: si lo corta, hay que decirlo
         // en vez de presentar totales incompletos como si fueran definitivos.
         statusElem.textContent = diskAnalyzerData.truncated
-            ? `⚠️ ${t("disk_scan_truncated")} (${diskAnalyzerData.scan_time_seconds} s)`
+            ? `${t("disk_scan_truncated")} (${diskAnalyzerData.scan_time_seconds} s)`
             : t("disk_analyzer_scan_done").replace("{s}", diskAnalyzerData.scan_time_seconds);
         statusElem.classList.toggle("warning", Boolean(diskAnalyzerData.truncated));
     }
@@ -2839,8 +2864,7 @@ function renderDiskAnalyzerExtensions() {
     diskAnalyzerExtBody.innerHTML = diskAnalyzerData.extensions.map(ext => `
         <tr>
             <td>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background: ${safeColor(ext.color)}; display: inline-block;"></span>
+                <div class="disk-analyzer-cell-name">
                     <strong>${escapeHtml(ext.extension)}</strong>
                 </div>
             </td>
@@ -2849,7 +2873,7 @@ function renderDiskAnalyzerExtensions() {
             <td>
                 <div class="disk-analyzer-bar-cell">
                     <div class="disk-analyzer-bar-mini">
-                        <div class="disk-analyzer-bar-mini-fill" style="width: ${safeNumber(ext.percent)}%; background: ${safeColor(ext.color)};"></div>
+                        <div class="disk-analyzer-bar-mini-fill" style="width: ${safeNumber(ext.percent)}%;"></div>
                     </div>
                     <span>${safeNumber(ext.percent)}%</span>
                 </div>
@@ -2875,22 +2899,13 @@ function renderDiskAnalyzerTreemap() {
     const items = diskAnalyzerData.treemap;
     if (items.length === 0) return;
 
-    const categoryColors = [
-        "#77736c", "#918a7d", "#6e746f", "#9b8f7a", "#8a7770",
-        "#7c8277", "#a09384", "#6b6e69", "#958d82", "#737975"
-    ];
+    const maxSize = Math.max(...items.map(it => Number(it.size) || 0), 1);
+    const darkUi = document.documentElement.classList.contains("dark");
 
-    function getTileColor(item, index) {
-        if (item.color && item.color !== "#8d8b85" && item.color !== "#94a3b8") return item.color;
-        if (item.is_dir) return categoryColors[index % categoryColors.length];
-        
-        const ext = (item.extension || item.name.split(".").pop() || "").toLowerCase().replace(/^\./, "");
-        if (ext) {
-            let hash = 0;
-            for (let i = 0; i < ext.length; i++) hash = (hash * 47 + ext.charCodeAt(i)) % 360;
-            return `hsl(${hash}, 26%, 58%)`;
-        }
-        return categoryColors[index % categoryColors.length];
+    function tileTone(item) {
+        const weight = Math.sqrt(Math.max(Number(item.size) || 0, 0) / maxSize);
+        const light = darkUi ? 18 + weight * 26 : 78 - weight * 32;
+        return { light, fill: `hsl(32 12% ${light}%)` };
     }
 
     function squarify(rects, x, y, w, h) {
@@ -2939,39 +2954,38 @@ function renderDiskAnalyzerTreemap() {
         const rw = Math.max(1, r.w - gap * 2);
         const rh = Math.max(1, r.h - gap * 2);
 
-        const baseColor = getTileColor(r.item, idx);
-        
-        ctx.fillStyle = baseColor;
+        const tone = tileTone(r.item);
+        ctx.fillStyle = tone.fill;
         ctx.beginPath();
         if (ctx.roundRect) {
-            ctx.roundRect(rx, ry, rw, rh, 4);
+            ctx.roundRect(rx, ry, rw, rh, 5);
         } else {
             ctx.rect(rx, ry, rw, rh);
         }
         ctx.fill();
 
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.strokeStyle = darkUi ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.45)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
         if (rw > 40 && rh > 18) {
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 11px sans-serif";
-            ctx.shadowColor = "rgba(0,0,0,0.85)";
-            ctx.shadowBlur = 4;
-            
+            const ink = tone.light > 48 ? "rgba(28,24,20,0.88)" : "rgba(252,248,244,0.92)";
+            ctx.fillStyle = ink;
+            ctx.font = "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+            ctx.shadowBlur = 0;
+
             const maxChars = Math.floor(rw / 7);
             let nameStr = r.item.name;
             if (nameStr.length > maxChars) nameStr = nameStr.substring(0, Math.max(2, maxChars - 2)) + "..";
-            
-            ctx.fillText(nameStr, rx + 6, ry + 16);
+
+            ctx.fillText(nameStr, rx + 7, ry + 16);
 
             if (rh > 34 && rw > 60) {
-                ctx.font = "10px sans-serif";
-                ctx.fillStyle = "rgba(255,255,255,0.85)";
-                ctx.fillText(r.item.size_formatted, rx + 6, ry + 28);
+                ctx.font = "500 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+                ctx.globalAlpha = 0.72;
+                ctx.fillText(r.item.size_formatted, rx + 7, ry + 30);
+                ctx.globalAlpha = 1;
             }
-            ctx.shadowBlur = 0;
         }
     });
 }
@@ -2984,7 +2998,7 @@ if (diskAnalyzerCanvas) {
 
         const found = treemapRects.find(r => mouseX >= r.x && mouseX <= r.x + r.w && mouseY >= r.y && mouseY <= r.y + r.h);
         if (found && diskAnalyzerHoverInfo) {
-            diskAnalyzerHoverInfo.textContent = `📍 ${found.item.name} (${found.item.size_formatted}) — ${found.item.path}`;
+            diskAnalyzerHoverInfo.textContent = `${found.item.name} (${found.item.size_formatted}) — ${found.item.path}`;
         }
     });
 

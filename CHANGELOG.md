@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the indigo/SaaS look with real Liquid Glass: colorless lens over a photographic desktop. Controls are frost capsules; they take the wallpaper color. No brand blue.
+
+### Fixed
+
+- Settings button no longer loses its label on load.
+- Disk analyzer dialog no longer stays visible when closed (`display: flex` overrode the native `<dialog>` hide).
+- Deduplicate tab no longer starts a full scan just by opening Settings.
+- Selecting a disk item no longer throws `formatBytes is not defined`.
+- English copy no longer refers to the old Sortix name.
+- Analyzer delete confirmation now says trash, matching the actual backend behavior.
+- Places, folders and files are keyboard-accessible buttons.
+- Missing favicon no longer 404s.
+
 ### Security
 
 - **Fixed an exploitable XSS flaw with local API access.** `escapeHtml()` failed to escape quotes and was interpolated inside HTML attribute strings. A downloaded directory named with malicious attributes could break out of the HTML attribute context and execute arbitrary JavaScript under Martix's origin, exposing local API deletion endpoints. **Upgrade immediately.**
