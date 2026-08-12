@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Replaced the indigo/glass SaaS look with an Apple Liquid Glass interface: system blue, optical layers, no neon.
+- Replaced the indigo/SaaS look with real Liquid Glass: colorless lens over a photographic desktop. Controls are frost capsules; they take the wallpaper color. No brand blue.
 
 ### Fixed
 

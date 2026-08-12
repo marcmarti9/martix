@@ -1,50 +1,51 @@
 /* ==========================================================================
    MARTIX — Liquid Glass
-   Optical glass over a quiet desktop. System type, one blue, no neon.
+   Colorless lens over a photograph. The glass takes the wallpaper's color.
+   No brand blue. Ink on frost, like Apple's control capsules.
    ========================================================================== */
 
 :root {
     color-scheme: light;
 
-    --bg: oklch(93.5% 0.008 250);
-    --bg-deep: oklch(89% 0.012 240);
-    --surface: oklch(97% 0.004 250 / 0.55);
-    --surface-solid: oklch(98.6% 0.003 250);
-    --surface-raised: oklch(99.4% 0.002 250 / 0.72);
-    --surface-hover: oklch(100% 0 0 / 0.42);
-    --surface-selected: oklch(58% 0.16 250 / 0.12);
+    --bg: transparent;
+    --bg-deep: transparent;
+    --surface: rgb(255 255 255 / 0.14);
+    --surface-solid: rgb(255 255 255 / 0.42);
+    --surface-raised: rgb(255 255 255 / 0.2);
+    --surface-hover: rgb(255 255 255 / 0.3);
+    --surface-selected: rgb(255 255 255 / 0.36);
 
-    --glass: oklch(100% 0.004 250 / 0.58);
-    --glass-strong: oklch(100% 0.003 250 / 0.78);
-    --glass-stroke: oklch(100% 0 0 / 0.62);
-    --glass-stroke-soft: oklch(30% 0.02 250 / 0.08);
-    --glass-sheen: inset 0 1px 0 oklch(100% 0 0 / 0.72),
-                   inset 0 -0.5px 0 oklch(30% 0.02 250 / 0.06);
-    --glass-blur: 28px;
-    --glass-sat: 1.7;
+    --glass: rgb(255 255 255 / 0.16);
+    --glass-strong: rgb(255 255 255 / 0.34);
+    --glass-stroke: rgb(255 255 255 / 0.55);
+    --glass-stroke-soft: rgb(255 255 255 / 0.28);
+    --glass-sheen: inset 0 1px 0 rgb(255 255 255 / 0.7),
+                   inset 0 -1px 0 rgb(0 0 0 / 0.08);
+    --glass-blur: 40px;
+    --glass-sat: 1.85;
 
-    --line: oklch(40% 0.015 250 / 0.12);
-    --line-soft: oklch(40% 0.015 250 / 0.07);
+    --line: rgb(0 0 0 / 0.12);
+    --line-soft: rgb(0 0 0 / 0.07);
 
-    --text: oklch(18% 0.02 250);
-    --text-muted: oklch(40% 0.018 250);
-    --text-dim: oklch(54% 0.014 250);
+    --text: rgb(18 16 14);
+    --text-muted: rgb(48 42 36 / 0.78);
+    --text-dim: rgb(48 42 36 / 0.55);
 
-    --accent: oklch(55% 0.18 250);
-    --accent-strong: oklch(48% 0.19 250);
-    --accent-soft: oklch(58% 0.16 250 / 0.14);
-    --accent-ink: oklch(99% 0 0);
+    --accent: var(--text);
+    --accent-strong: var(--text);
+    --accent-soft: rgb(255 255 255 / 0.28);
+    --accent-ink: var(--text);
 
-    --success: oklch(52% 0.13 155);
-    --success-soft: oklch(52% 0.13 155 / 0.12);
-    --warning: oklch(68% 0.14 75);
-    --warning-soft: oklch(80% 0.1 75 / 0.18);
-    --danger: oklch(55% 0.19 25);
-    --danger-soft: oklch(55% 0.19 25 / 0.12);
+    --success: oklch(42% 0.08 155);
+    --success-soft: rgb(255 255 255 / 0.22);
+    --warning: oklch(52% 0.1 70);
+    --warning-soft: rgb(255 255 255 / 0.22);
+    --danger: oklch(48% 0.16 25);
+    --danger-soft: rgb(255 255 255 / 0.22);
 
-    --shadow-sm: 0 1px 2px oklch(20% 0.02 250 / 0.06);
-    --shadow-md: 0 10px 30px oklch(30% 0.02 250 / 0.1), 0 1px 2px oklch(20% 0.02 250 / 0.05);
-    --shadow-lg: 0 24px 60px oklch(25% 0.02 250 / 0.16), 0 2px 8px oklch(20% 0.02 250 / 0.06);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.08);
+    --shadow-md: 0 10px 28px rgb(0 0 0 / 0.14);
+    --shadow-lg: 0 28px 70px rgb(0 0 0 / 0.28);
 
     --radius-xs: 8px;
     --radius-sm: 12px;
@@ -79,43 +80,43 @@
 :root.dark {
     color-scheme: dark;
 
-    --bg: oklch(16% 0.012 250);
-    --bg-deep: oklch(11% 0.01 250);
-    --surface: oklch(22% 0.012 250 / 0.48);
-    --surface-solid: oklch(18% 0.012 250);
-    --surface-raised: oklch(28% 0.012 250 / 0.55);
-    --surface-hover: oklch(100% 0 0 / 0.08);
-    --surface-selected: oklch(68% 0.14 250 / 0.2);
+    --bg: transparent;
+    --bg-deep: transparent;
+    --surface: rgb(8 8 10 / 0.28);
+    --surface-solid: rgb(12 12 14 / 0.55);
+    --surface-raised: rgb(255 255 255 / 0.08);
+    --surface-hover: rgb(255 255 255 / 0.12);
+    --surface-selected: rgb(255 255 255 / 0.16);
 
-    --glass: oklch(28% 0.012 250 / 0.46);
-    --glass-strong: oklch(32% 0.012 250 / 0.62);
-    --glass-stroke: oklch(100% 0 0 / 0.16);
-    --glass-stroke-soft: oklch(100% 0 0 / 0.08);
-    --glass-sheen: inset 0 1px 0 oklch(100% 0 0 / 0.22),
-                   inset 0 -0.5px 0 oklch(0% 0 0 / 0.35);
+    --glass: rgb(255 255 255 / 0.08);
+    --glass-strong: rgb(255 255 255 / 0.16);
+    --glass-stroke: rgb(255 255 255 / 0.22);
+    --glass-stroke-soft: rgb(255 255 255 / 0.12);
+    --glass-sheen: inset 0 1px 0 rgb(255 255 255 / 0.28),
+                   inset 0 -1px 0 rgb(0 0 0 / 0.35);
 
-    --line: oklch(100% 0 0 / 0.1);
-    --line-soft: oklch(100% 0 0 / 0.06);
+    --line: rgb(255 255 255 / 0.14);
+    --line-soft: rgb(255 255 255 / 0.08);
 
-    --text: oklch(96% 0.006 250);
-    --text-muted: oklch(78% 0.012 250);
-    --text-dim: oklch(62% 0.012 250);
+    --text: rgb(248 246 244);
+    --text-muted: rgb(248 246 244 / 0.78);
+    --text-dim: rgb(248 246 244 / 0.5);
 
-    --accent: oklch(68% 0.15 250);
-    --accent-strong: oklch(74% 0.13 250);
-    --accent-soft: oklch(68% 0.14 250 / 0.18);
-    --accent-ink: oklch(99% 0 0);
+    --accent: var(--text);
+    --accent-strong: var(--text);
+    --accent-soft: rgb(255 255 255 / 0.12);
+    --accent-ink: var(--text);
 
-    --success: oklch(74% 0.13 155);
-    --success-soft: oklch(74% 0.13 155 / 0.16);
-    --warning: oklch(80% 0.12 80);
-    --warning-soft: oklch(80% 0.12 80 / 0.16);
-    --danger: oklch(68% 0.16 25);
-    --danger-soft: oklch(68% 0.16 25 / 0.16);
+    --success: oklch(78% 0.08 155);
+    --success-soft: rgb(255 255 255 / 0.1);
+    --warning: oklch(80% 0.08 80);
+    --warning-soft: rgb(255 255 255 / 0.1);
+    --danger: oklch(72% 0.12 25);
+    --danger-soft: rgb(255 255 255 / 0.1);
 
-    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.35);
-    --shadow-md: 0 12px 36px oklch(0% 0 0 / 0.42);
-    --shadow-lg: 0 28px 70px oklch(0% 0 0 / 0.55);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-md: 0 12px 36px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 28px 70px rgb(0 0 0 / 0.6);
 }
 
 * { box-sizing: border-box; }
@@ -130,7 +131,7 @@ html, body {
 
 body {
     position: relative;
-    background: var(--bg);
+    background: #1a1612;
     color: var(--text);
     font-family: var(--font);
     font-size: 13px;
@@ -140,26 +141,28 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Quiet desktop wash. Not a mesh, not a blob field. */
-body::before {
-    content: "";
+.desktop-scene {
     position: fixed;
     inset: 0;
     z-index: 0;
     pointer-events: none;
     background:
-        radial-gradient(1200px 700px at 12% -10%, oklch(98% 0.02 230 / 0.7), transparent 58%),
-        radial-gradient(900px 600px at 92% 8%, oklch(94% 0.018 80 / 0.35), transparent 52%),
-        radial-gradient(800px 700px at 70% 110%, oklch(90% 0.02 250 / 0.45), transparent 55%),
-        linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+        url("wallpaper-light.jpg") center / cover no-repeat;
 }
 
-:root.dark body::before {
-    background:
-        radial-gradient(1000px 640px at 8% -8%, oklch(28% 0.03 240 / 0.55), transparent 60%),
-        radial-gradient(800px 520px at 96% 0%, oklch(24% 0.02 80 / 0.22), transparent 50%),
-        radial-gradient(700px 600px at 70% 115%, oklch(20% 0.025 250 / 0.5), transparent 55%),
-        linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+:root.dark .desktop-scene {
+    background-image: url("wallpaper-dark.jpg");
+}
+
+.desktop-scene::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgb(255 248 240 / 0.08);
+}
+
+:root.dark .desktop-scene::after {
+    background: rgb(0 0 0 / 0.22);
 }
 
 button, input, select, textarea {
@@ -218,6 +221,7 @@ a { color: var(--accent); text-decoration: none; }
     height: 100vh;
     display: flex;
     flex-direction: column;
+    background: transparent;
 }
 
 .app-header {
@@ -247,10 +251,13 @@ a { color: var(--accent); text-decoration: none; }
     height: 30px;
     display: grid;
     place-items: center;
-    border-radius: 9px;
-    color: var(--accent-ink);
-    background: var(--accent);
-    box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.28);
+    border-radius: 10px;
+    color: var(--text);
+    background: var(--glass);
+    border: 1px solid var(--glass-stroke);
+    box-shadow: var(--glass-sheen);
+    backdrop-filter: blur(20px) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(20px) saturate(var(--glass-sat));
 }
 
 .brand-logo svg { width: 16px; height: 16px; }
@@ -339,8 +346,16 @@ a { color: var(--accent); text-decoration: none; }
 
 :root.dark .switch-thumb { background: oklch(94% 0.005 250); }
 
-.auto-organize-control input:checked + .switch-track { background: var(--accent); }
+.auto-organize-control input:checked + .switch-track {
+    background: rgb(20 18 16 / 0.72);
+}
+:root.dark .auto-organize-control input:checked + .switch-track {
+    background: rgb(255 255 255 / 0.82);
+}
 .auto-organize-control input:checked + .switch-track .switch-thumb { transform: translateX(14px); }
+:root.dark .auto-organize-control input:checked + .switch-track .switch-thumb {
+    background: rgb(18 16 14);
+}
 
 .breadcrumbs {
     display: flex;
@@ -410,24 +425,24 @@ a { color: var(--accent); text-decoration: none; }
     flex-shrink: 0;
 }
 
-.btn-primary, .btn-settings {
-    color: var(--accent-ink);
-    background: var(--accent);
-    border-color: transparent;
-    box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.22);
-}
-
-.btn-primary:hover, .btn-settings:hover { background: var(--accent-strong); }
-.btn-primary:active, .btn-settings:active { transform: scale(0.98); }
-
-.btn-quiet {
+.btn-primary, .btn-settings, .btn-quiet {
     color: var(--text);
-    background: var(--surface-raised);
-    border-color: var(--glass-stroke-soft);
-    box-shadow: var(--glass-sheen);
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    background: var(--glass);
+    border-color: var(--glass-stroke);
+    box-shadow: var(--glass-sheen), var(--shadow-sm);
+    backdrop-filter: blur(28px) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(28px) saturate(var(--glass-sat));
 }
+
+.btn-primary {
+    background: var(--glass-strong);
+    font-weight: 620;
+}
+
+.btn-primary:hover, .btn-settings:hover, .btn-quiet:hover {
+    background: var(--surface-hover);
+}
+.btn-primary:active, .btn-settings:active { transform: scale(0.98); }
 
 .btn-quiet:hover { background: var(--surface-hover); }
 .btn-quiet:active { transform: scale(0.98); }
@@ -458,9 +473,13 @@ a { color: var(--accent); text-decoration: none; }
     width: 32px;
     height: 32px;
     padding: 0;
-    color: var(--text-muted);
-    background: transparent;
-    border-radius: var(--radius-sm);
+    color: var(--text);
+    background: var(--glass);
+    border: 1px solid var(--glass-stroke);
+    border-radius: var(--radius-full);
+    box-shadow: var(--glass-sheen);
+    backdrop-filter: blur(24px) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(24px) saturate(var(--glass-sat));
 }
 
 .icon-button:hover, .icon-btn:hover {
@@ -493,6 +512,11 @@ a { color: var(--accent); text-decoration: none; }
     font-weight: 600;
     border-radius: var(--radius-full);
     cursor: pointer;
+    background: var(--glass);
+    border-color: var(--glass-stroke);
+    box-shadow: var(--glass-sheen);
+    backdrop-filter: blur(20px) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(20px) saturate(var(--glass-sat));
 }
 
 .lang-select:hover, .select-control:hover, .text-control:hover {
@@ -718,9 +742,11 @@ option { background: var(--surface-solid); color: var(--text); }
     place-items: center;
     width: 36px;
     height: 36px;
-    border-radius: 10px;
-    color: var(--accent);
-    background: var(--accent-soft);
+    border-radius: 12px;
+    color: var(--text);
+    background: rgb(255 255 255 / 0.22);
+    border: 1px solid var(--glass-stroke-soft);
+    box-shadow: var(--glass-sheen);
     flex: 0 0 auto;
 }
 
@@ -756,8 +782,8 @@ option { background: var(--surface-solid); color: var(--text); }
 .category-card-action svg, .tile-action svg { width: 14px; height: 14px; }
 
 .file-tile .tile-leading {
-    color: var(--text-muted);
-    background: var(--surface-hover);
+    color: var(--text);
+    background: rgb(255 255 255 / 0.16);
 }
 
 /* --------------------------------------------------------------------------
@@ -912,9 +938,9 @@ dialog { color: var(--text); padding: 0; border: none; background: transparent; 
 }
 
 .modal-dialog::backdrop {
-    background: oklch(20% 0.02 250 / 0.28);
-    backdrop-filter: blur(18px) saturate(1.3);
-    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    background: rgb(20 16 12 / 0.28);
+    backdrop-filter: blur(22px) saturate(1.4);
+    -webkit-backdrop-filter: blur(22px) saturate(1.4);
 }
 
 :root.dark .modal-dialog::backdrop { background: oklch(0% 0 0 / 0.46); }
@@ -1150,8 +1176,9 @@ dialog { color: var(--text); padding: 0; border: none; background: transparent; 
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    color: var(--accent-ink);
-    background: var(--accent);
+    color: var(--text);
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-stroke);
     font-size: 11px;
     font-weight: 650;
     margin-right: 6px;
