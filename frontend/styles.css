@@ -612,22 +612,6 @@ option { background: var(--surface-solid); color: var(--text); }
 .tree-item .icon { width: 16px; height: 16px; flex: 0 0 auto; }
 .sidebar-spacer { flex: 1; min-height: 16px; }
 
-.privacy-card {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    margin: 0 4px 12px;
-    padding: 10px 12px;
-    border-radius: var(--radius-md);
-    background: var(--success-soft);
-    border: 0.5px solid oklch(52% 0.13 155 / 0.18);
-}
-
-.privacy-card-icon { color: var(--success); flex: 0 0 auto; margin-top: 1px; }
-.privacy-card svg { width: 16px; height: 16px; }
-.privacy-card strong { display: block; font-size: 12px; font-weight: 620; }
-.privacy-card span { display: block; color: var(--text-muted); font-size: 11px; margin-top: 1px; }
-
 .sidebar-metric {
     display: flex;
     align-items: center;
@@ -688,9 +672,9 @@ option { background: var(--surface-solid); color: var(--text); }
 }
 
 .status-pill.active {
-    color: var(--success);
-    border-color: transparent;
-    background: var(--success-soft);
+    color: var(--text);
+    border-color: var(--glass-stroke);
+    background: var(--glass-strong);
 }
 
 .status-pill .dot {
@@ -1327,7 +1311,7 @@ dialog { color: var(--text); padding: 0; border: none; background: transparent; 
 .disk-analyzer-bar-mini-fill { height: 100%; border-radius: inherit; background: var(--accent); }
 
 .treemap-panel { margin: 0 22px 10px; }
-.treemap-container { height: 188px; padding: 8px; background: var(--bg); }
+.treemap-container { height: 260px; padding: 8px; background: transparent; }
 #disk-analyzer-treemap-canvas { width: 100%; height: 100%; display: block; border-radius: 8px; }
 
 .disk-footer {
@@ -1439,7 +1423,7 @@ dialog { color: var(--text); padding: 0; border: none; background: transparent; 
         padding: 10px;
         backdrop-filter: blur(20px);
     }
-    .sidebar-heading, .sidebar-spacer, .privacy-card, .sidebar-metric { display: none; }
+    .sidebar-heading, .sidebar-spacer, .sidebar-metric { display: none; }
     .folder-tree { flex-direction: row; gap: 4px; overflow-x: auto; padding: 0; }
     .tree-item { min-width: max-content; width: auto; }
     .content-pane { padding: 16px 14px 32px; overflow: visible; }

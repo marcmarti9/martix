@@ -9,8 +9,8 @@
 
 const TRANSLATIONS = {
     es: {
-        patrol_label: "Auto-Organizar",
-        patrol_title: "Organización automática de Descargas en tiempo real",
+        patrol_label: "En vivo",
+        patrol_title: "Clasifica Descargas en cuanto terminan",
         organize_btn: "Organizar ahora",
         settings_title: "Ajustes",
         organized_count_prefix: "Archivos organizados",
@@ -117,9 +117,9 @@ const TRANSLATIONS = {
         data: "Datos",
         
         status_conn_error: "No se pudo contactar con Martix.",
-        status_patrol_active: "Patrulla activa: vigilando Descargas.",
-        status_patrol_inactive: "Patrulla desactivada.",
-        status_patrol_error: "No se pudo cambiar la Patrulla Activa.",
+        status_patrol_active: "Clasificación en vivo: Descargas.",
+        status_patrol_inactive: "Clasificación en vivo en pausa.",
+        status_patrol_error: "No se pudo cambiar la clasificación en vivo.",
         status_organizing: "Organizando...",
         status_organized_done: "Listo: {moved} archivo(s) organizado(s); {review} para revisar.",
         status_organize_error: "Fallo al organizar la carpeta de descargas.",
@@ -234,8 +234,8 @@ const TRANSLATIONS = {
         stats_load_error: "No se pudieron cargar las estadísticas.",
 
         // Toolbar & Header
-        patrol_on: "REC / Vigilando",
-        patrol_off: "Pausa / Desactivado",
+        patrol_on: "En vivo",
+        patrol_off: "En pausa",
         organize_title: "Organizar archivos de descargas y carpetas vigiladas inmediatamente",
         simulate_btn: "Simular (Prueba)",
         simulate_title: "Prueba tus reglas sin mover ningún archivo real",
@@ -317,8 +317,8 @@ const TRANSLATIONS = {
         status_updating: "Actualizando Martix en segundo plano..."
     },
     en: {
-        patrol_label: "Active Patrol",
-        patrol_title: "Watch Downloads in real time",
+        patrol_label: "Live sort",
+        patrol_title: "File new downloads as they finish",
         organize_btn: "Organize now",
         settings_title: "Settings & Rules",
         organized_count_prefix: "Organized files",
@@ -329,8 +329,8 @@ const TRANSLATIONS = {
         tab_rules: "Rules by Extension",
 
         // Toolbar & Header
-        patrol_on: "REC / Watching",
-        patrol_off: "Paused / Off",
+        patrol_on: "Live",
+        patrol_off: "Paused",
         organize_title: "Organize downloads and watched folders immediately",
         simulate_btn: "Simulate (Test)",
         simulate_title: "Test your rules without moving any real files",
@@ -355,7 +355,7 @@ const TRANSLATIONS = {
         welcome_sub: "Your intelligent, 100% local and private file organizer.",
         slide1_title: "100% Local & Private",
         slide1_desc: "Your documents, invoices, and photos never leave your machine. No cloud, no tracking, and no internet data calls.",
-        slide2_title: "Real-Time Active Patrol",
+        slide2_title: "Live sorting",
         slide2_desc: "Martix watches your Downloads and custom folders. Once a download finishes (.crdownload / .part), it automatically files it in its target destination.",
         slide3_title: "Scratch Rules, OCR & Metadata",
         slide3_desc: "Define visual rules combining extension, keywords, age (days), image OCR scanning, and EXIF/ID3 metadata tags. Connect local Ollama AI whenever needed.",
@@ -509,9 +509,9 @@ const TRANSLATIONS = {
         data: "Data",
         
         status_conn_error: "Could not connect to Martix.",
-        status_patrol_active: "Patrol active: watching Downloads.",
-        status_patrol_inactive: "Patrol deactivated.",
-        status_patrol_error: "Could not toggle Active Patrol.",
+        status_patrol_active: "Live sort is on: Downloads.",
+        status_patrol_inactive: "Live sort is paused.",
+        status_patrol_error: "Could not change live sort.",
         status_organizing: "Organizing...",
         status_organized_done: "Done: {moved} file(s) organized; {review} need review.",
         status_organize_error: "Failed to organize downloads folder.",
@@ -2864,8 +2864,7 @@ function renderDiskAnalyzerExtensions() {
     diskAnalyzerExtBody.innerHTML = diskAnalyzerData.extensions.map(ext => `
         <tr>
             <td>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background: ${safeColor(ext.color)}; display: inline-block;"></span>
+                <div class="disk-analyzer-cell-name">
                     <strong>${escapeHtml(ext.extension)}</strong>
                 </div>
             </td>
@@ -2874,7 +2873,7 @@ function renderDiskAnalyzerExtensions() {
             <td>
                 <div class="disk-analyzer-bar-cell">
                     <div class="disk-analyzer-bar-mini">
-                        <div class="disk-analyzer-bar-mini-fill" style="width: ${safeNumber(ext.percent)}%; background: ${safeColor(ext.color)};"></div>
+                        <div class="disk-analyzer-bar-mini-fill" style="width: ${safeNumber(ext.percent)}%;"></div>
                     </div>
                     <span>${safeNumber(ext.percent)}%</span>
                 </div>
@@ -2900,22 +2899,13 @@ function renderDiskAnalyzerTreemap() {
     const items = diskAnalyzerData.treemap;
     if (items.length === 0) return;
 
-    const categoryColors = [
-        "#77736c", "#918a7d", "#6e746f", "#9b8f7a", "#8a7770",
-        "#7c8277", "#a09384", "#6b6e69", "#958d82", "#737975"
-    ];
+    const maxSize = Math.max(...items.map(it => Number(it.size) || 0), 1);
+    const darkUi = document.documentElement.classList.contains("dark");
 
-    function getTileColor(item, index) {
-        if (item.color && item.color !== "#8d8b85" && item.color !== "#94a3b8") return item.color;
-        if (item.is_dir) return categoryColors[index % categoryColors.length];
-        
-        const ext = (item.extension || item.name.split(".").pop() || "").toLowerCase().replace(/^\./, "");
-        if (ext) {
-            let hash = 0;
-            for (let i = 0; i < ext.length; i++) hash = (hash * 47 + ext.charCodeAt(i)) % 360;
-            return `hsl(${hash}, 26%, 58%)`;
-        }
-        return categoryColors[index % categoryColors.length];
+    function tileTone(item) {
+        const weight = Math.sqrt(Math.max(Number(item.size) || 0, 0) / maxSize);
+        const light = darkUi ? 18 + weight * 26 : 78 - weight * 32;
+        return { light, fill: `hsl(32 12% ${light}%)` };
     }
 
     function squarify(rects, x, y, w, h) {
@@ -2964,39 +2954,38 @@ function renderDiskAnalyzerTreemap() {
         const rw = Math.max(1, r.w - gap * 2);
         const rh = Math.max(1, r.h - gap * 2);
 
-        const baseColor = getTileColor(r.item, idx);
-        
-        ctx.fillStyle = baseColor;
+        const tone = tileTone(r.item);
+        ctx.fillStyle = tone.fill;
         ctx.beginPath();
         if (ctx.roundRect) {
-            ctx.roundRect(rx, ry, rw, rh, 4);
+            ctx.roundRect(rx, ry, rw, rh, 5);
         } else {
             ctx.rect(rx, ry, rw, rh);
         }
         ctx.fill();
 
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+        ctx.strokeStyle = darkUi ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.45)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
         if (rw > 40 && rh > 18) {
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "bold 11px sans-serif";
-            ctx.shadowColor = "rgba(0,0,0,0.85)";
-            ctx.shadowBlur = 4;
-            
+            const ink = tone.light > 48 ? "rgba(28,24,20,0.88)" : "rgba(252,248,244,0.92)";
+            ctx.fillStyle = ink;
+            ctx.font = "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+            ctx.shadowBlur = 0;
+
             const maxChars = Math.floor(rw / 7);
             let nameStr = r.item.name;
             if (nameStr.length > maxChars) nameStr = nameStr.substring(0, Math.max(2, maxChars - 2)) + "..";
-            
-            ctx.fillText(nameStr, rx + 6, ry + 16);
+
+            ctx.fillText(nameStr, rx + 7, ry + 16);
 
             if (rh > 34 && rw > 60) {
-                ctx.font = "10px sans-serif";
-                ctx.fillStyle = "rgba(255,255,255,0.85)";
-                ctx.fillText(r.item.size_formatted, rx + 6, ry + 28);
+                ctx.font = "500 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+                ctx.globalAlpha = 0.72;
+                ctx.fillText(r.item.size_formatted, rx + 7, ry + 30);
+                ctx.globalAlpha = 1;
             }
-            ctx.shadowBlur = 0;
         }
     });
 }

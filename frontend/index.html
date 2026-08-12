@@ -14,8 +14,10 @@
         <header id="toolbar" class="app-header">
             <div id="toolbar-brand" class="brand-lockup">
                 <div class="brand-logo" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3.2" y="4.2" width="8.2" height="11.2" rx="1.8"/>
+                        <rect x="12.6" y="8.4" width="8.2" height="11.4" rx="1.8"/>
+                        <path d="M5.6 8h3.2M5.6 11h3.2M15 12.2h3.2M15 15.2h3.2"/>
                     </svg>
                 </div>
                 <div>
@@ -29,8 +31,8 @@
             </div>
 
             <div id="toolbar-actions" class="header-actions">
-                <label class="auto-organize-control" data-i18n-title="patrol_title" title="Organización automática de Descargas en tiempo real">
-                    <span class="toolbar-label" data-i18n="patrol_label">Auto-organizar</span>
+                <label class="auto-organize-control" data-i18n-title="patrol_title" title="Clasifica Descargas en cuanto terminan">
+                    <span class="toolbar-label" data-i18n="patrol_label">En vivo</span>
                     <input type="checkbox" id="patrol-toggle">
                     <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
                 </label>
@@ -85,15 +87,6 @@
                 </div>
                 <ul id="folder-tree" class="folder-tree" aria-label="Carpetas"></ul>
                 <div class="sidebar-spacer"></div>
-                <div class="privacy-card">
-                    <div class="privacy-card-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 19 6v5c0 4.5-2.8 8.1-7 10-4.2-1.9-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
-                    </div>
-                    <div>
-                        <strong data-i18n="privacy_title">Solo en este equipo</strong>
-                        <span data-i18n="privacy_caption">Sin nube ni telemetría</span>
-                    </div>
-                </div>
                 <div class="sidebar-metric">
                     <span data-i18n="organized_count_prefix">Archivos organizados</span>
                     <strong id="files-organized-count">0</strong>
@@ -108,7 +101,7 @@
                         <p id="content-description" class="content-description" data-i18n="content_description">Tus carpetas importantes, en un solo lugar.</p>
                     </div>
                     <div class="content-toolbar-meta">
-                        <span id="patrol-status-pill" class="status-pill inactive"><span class="dot" aria-hidden="true"></span><span id="patrol-status-text">Pausa / Desactivado</span></span>
+                        <span id="patrol-status-pill" class="status-pill inactive"><span class="dot" aria-hidden="true"></span><span id="patrol-status-text">En pausa</span></span>
                     </div>
                 </div>
 
