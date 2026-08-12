@@ -18,8 +18,7 @@ Lavado de cara visual de Martix a estética **Apple Liquid Glass** premium, sin 
 - Effort: Polished (asumido; entrevista omitida por petición explícita)
 
 ## Current status
-- complete: Liquid Glass + bugs de UI + tests + verificación browser
-- in progress: PR
+- complete: Liquid Glass + bugs de UI + tests + verificación browser + PR
 - not started: merge (queda al usuario)
 
 ## Decisions
@@ -33,6 +32,7 @@ Lavado de cara visual de Martix a estética **Apple Liquid Glass** premium, sin 
 
 ## Important files and artifacts
 - Branch: `facelift/liquid-glass`
+- PR: https://github.com/marcmarti9/martix/pull/4
 - `frontend/styles.css`, `frontend/index.html`, `frontend/app.js`
 - Continuity: `docs/agentit/STATE.md`
 
