@@ -174,9 +174,11 @@ def _choose_model(models: list[str], requested: str) -> str | None:
     if not models:
         return None
     requested = (requested or "").strip()
-    for model in models:
-        if model == requested or model.startswith(requested + ":"):
-            return model
+    if requested:
+        for model in models:
+            if model == requested or model.startswith(requested + ":"):
+                return model
+        return None
 
     preferred = ("llama3.2", "qwen2.5", "qwen3", "gemma3", "phi3", "mistral")
     for prefix in preferred:
@@ -198,7 +200,7 @@ def _update_state(base_dict: dict | None = None, **changes) -> dict:
 
 
 def initialize(force: bool = False) -> dict:
-    """Detect local Ollama once, with an explicit local-only safety boundary."""
+    """Detect local Ollama once, strictly respecting user opt-in."""
     global LLM_URL, LLM_AUTO
     with _initialize_lock:
         with _state_lock:
@@ -221,7 +223,7 @@ def initialize(force: bool = False) -> dict:
         }
 
         if not explicit and not LLM_AUTO:
-            return _update_state(base, reason="Desactivado desde la configuración local.")
+            return _update_state(base, reason="LLM local desactivado. Solo se activa si el usuario lo indica (MARTIX_LLM=1).")
 
         from app.security import is_loopback_url
         if not is_loopback_url(LLM_URL):
@@ -238,11 +240,8 @@ def initialize(force: bool = False) -> dict:
             models = _discover_models(LLM_URL)
         except Exception as exc:
             probe_error = str(exc)
-            # Si Ollama esta instalado pero no se ha iniciado, lo levantamos
-            # solo en modo local y solo tras pasar el chequeo de recursos.
-            # Nunca se descarga software ni se abre un proceso de red remoto.
             models = []
-            if hardware_ok and _start_local_ollama():
+            if explicit and hardware_ok and _start_local_ollama():
                 for _ in range(6):
                     time.sleep(0.5)
                     try:
@@ -257,7 +256,7 @@ def initialize(force: bool = False) -> dict:
                     reason=(
                         "Ollama local no está disponible; se usa el modo heurístico."
                         if not _ollama_executable()
-                        else "Ollama está instalado pero no tiene un modelo local disponible."
+                        else "Ollama está instalado pero no responde o no tiene un modelo local disponible."
                     ),
                     probe_error=probe_error,
                 )
@@ -268,7 +267,11 @@ def initialize(force: bool = False) -> dict:
                 base,
                 available=True,
                 models=models,
-                reason="Ollama responde, pero no tiene ningún modelo local descargado.",
+                reason=(
+                    f"El modelo solicitado '{_settings.LLM_MODEL}' no está instalado en Ollama local."
+                    if _settings.LLM_MODEL
+                    else "Ollama responde, pero no tiene ningún modelo local descargado."
+                ),
             )
 
         return _update_state(
@@ -277,8 +280,8 @@ def initialize(force: bool = False) -> dict:
             available=True,
             model=selected,
             models=models,
-            reason=("Ollama local activado automáticamente." if not explicit
-                    else "Ollama local activado manualmente."),
+            reason=("Ollama local activado manualmente por el usuario." if explicit
+                    else "Ollama local activado automáticamente."),
         )
 
 
@@ -342,6 +345,7 @@ def suggest_subfolder(filename: str, content_excerpt: str, category_folder: str)
         "model": runtime_model,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": "30s",
         "options": {"temperature": 0, "num_predict": 12},
     }).encode("utf-8")
 

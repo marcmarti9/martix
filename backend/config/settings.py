@@ -114,20 +114,10 @@ def _env_flag(name: str) -> bool:
 
 
 # LLM local (Ollama) para nombrar carpetas de documentos que no encajan en
-# ningun Tema ni subcategoria. Apagado por defecto: en equipos modestos no
-# se nota nada y todo sigue funcionando por reglas/patrones.
-_llm_explicitly_configured = any(
-    key in _env for key in ("MARTIX_LLM", "SORTIX_LLM")
-)
+# ningun Tema ni subcategoria. Apagado por defecto: solo se activa unica y
+# exclusivamente si el usuario lo indica explicitamente (MARTIX_LLM=1).
 LLM_ENABLED = _env_flag("MARTIX_LLM") or _env_flag("SORTIX_LLM")
-# Si el usuario no ha tomado una decision, Martix puede detectar de forma
-# local si Ollama esta disponible y si el equipo tiene recursos suficientes.
-# Un MARTIX_LLM=0 explicito sigue siendo una opt-out real.
-LLM_AUTO = (
-    _env_flag("MARTIX_LLM_AUTO")
-    if "MARTIX_LLM_AUTO" in _env
-    else not _llm_explicitly_configured
-)
+LLM_AUTO = _env_flag("MARTIX_LLM_AUTO")
 LLM_URL = _env.get("MARTIX_LLM_URL", _env.get("SORTIX_LLM_URL", "http://127.0.0.1:11434"))
 LLM_MODEL = _env.get("MARTIX_LLM_MODEL", _env.get("SORTIX_LLM_MODEL", "llama3.2"))
 
