@@ -67,7 +67,7 @@ The existing `.desktop-scene` DOM node remains only for compatibility and is for
 - Source audit: no `url(` references and no gradient backgrounds in the new stylesheet.
 - The only `backdrop-filter` declarations explicitly set the legacy `.glass` helper to `none`; there is no active blur material.
 - Focus-visible, responsive breakpoints and `prefers-reduced-motion` remain defined.
-- GitHub Actions CI run `33093947131`: **success**.
+- GitHub Actions CI run `33094070723`: **success**.
 - CI includes server boot/API response plus integration, regression and security suites on Python 3.10, 3.12 and 3.13.
 - Rendered browser QA was not available through the current execution surface, so visual success is not claimed from code inspection alone.
 
