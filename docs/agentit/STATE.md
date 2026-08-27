@@ -1,54 +1,74 @@
 # Agentit state
 
+**Updated:** 2026-08-27
+**Status:** solid-workbench redesign implemented; verification and PR pending
+**Branch:** `redesign/solid-workbench`
+
 ## Goal
-Lavado de cara visual de Martix a estética **Apple Liquid Glass** premium, sin AI slop (neón, indigo glow, cards genéricas), y arreglo de bugs reales encontrados al inspeccionar la UI.
+Replace the merged Apple Liquid Glass visual direction with a durable repeated-use desktop UI for Martix. The new interface must use solid backgrounds, preserve the existing product behavior, remove random wallpaper imagery and avoid generic AI/SaaS visual tropes.
 
 ## Confirmed intent
-- Audience: usuario local que usa Martix como explorador/organizador diario.
-- Success: interfaz que se siente como utilidad de escritorio Apple (capas de cristal, especular, tipografía de sistema), no como dashboard SaaS; bugs funcionales de UI corregidos.
-- Constraints: CSP `font-src 'self'` (sin Google Fonts); vanilla CSS/JS; no cambiar el producto ni el modelo de privacidad; no preguntar (el usuario lo prohibió).
-- Non-goals: rediseño de IA/reglas, features nuevas, deploy, neon/cyberpunk.
+- Surface: **Operate** — a local desktop file explorer/organizer used repeatedly, not a marketing page.
+- Audience: users who need to scan folders, files, rules, status and disk information quickly.
+- Preserve: all existing product behavior, DOM hooks/IDs, privacy model, light/dark themes, CSP, vanilla CSS/JS architecture and accessibility semantics already present.
+- Replace: Liquid Glass material language, image wallpaper, pervasive translucency/blur, floating rounded cards and capsule-heavy navigation.
+- Explicit user constraint: no random background images; use a solid canvas.
+- Non-goals: backend changes, new features, workflow changes, deployment or unrelated bug fixes.
 
-## Domain pack
-- Pack: design + frontend
-- Craft depth: polished (dirección explícita posterior: Liquid Glass Apple)
-- Spend: normal
-- Topology: direct
-- critic_required: false
-- Effort: Polished (asumido; entrevista omitida por petición explícita)
+## Agentit route
+- Dispatch: `agentit` (explicit request + material redesign/research/repository work).
+- Packs: `design` + `frontend`.
+- Selected skills: `design-inspiration-research`, `design-taste-frontend`, `impeccable-design`, `emil-design-eng`, `frontend-ui-engineering`.
+- Research surface: live Awwwards references plus existing Martix visual truth.
+- Implementation topology: direct single-writer CSS redesign; no `app.js` edits.
+- Verification target: static source checks + existing automated test surfaces + rendered desktop/mobile review when browser execution is available.
 
-## Current status
-- complete: Liquid Glass + bugs de UI + tests + verificación browser + PR
-- not started: merge (queda al usuario)
+## Inspiration synthesis
+Durable source-to-decision provenance lives in `docs/agentit/REFERENCES.md`.
 
-## Decisions
-- Superficie: **Operate** (app de escritorio), no landing.
-- Tesis visual: *una lámina de cristal óptico sobre un escritorio quieto; el material hace el trabajo, no la decoración.*
-- Dials: variance 4 / motion 3 / density 6.
-- Paleta: neutrales cálidos + un solo acento system-blue Apple (`#007AFF` / `#0A84FF`). Cero indigo/violeta/neón.
-- Tipo: stack de sistema (SF Pro / Segoe UI Variable / system-ui). Sin Inter remoto.
-- Material: `backdrop-filter` + trazo especular + sombra ambiental. Sin glow, pulse ni hover-lift en cada card.
-- Interview skipped: el usuario pidió no preguntar; luego fijó Liquid Glass Apple.
+Strongest signals:
+- Extremely short palettes can create identity through hierarchy rather than effects.
+- Editorial/industrial grids and visible rules give structure without cardification.
+- Clean navigation and forms depend on typography, spacing, boundaries and state contrast.
+- Awwwards-level visual discipline is useful; Awwwards-style cinematic behavior is not appropriate for repeated Martix actions.
 
-## Important files and artifacts
-- Branch: `facelift/liquid-glass`
-- PR: https://github.com/marcmarti9/martix/pull/4
-- `frontend/styles.css`, `frontend/index.html`, `frontend/app.js`
-- Continuity: `docs/agentit/STATE.md`
+## Design direction
+- Thesis: **Local Workbench** — Martix feels like a well-made local instrument: quiet work surface, precise ink, visible structure and one oxide marker.
+- Dials: variance 5 / motion 2 / density 7.
+- Light canvas: warm bone; dark canvas: charcoal.
+- Accent: oxide/orange-red, used for primary and active state emphasis rather than decoration.
+- Typography: self-contained system stack with monospace for metadata/status labels; no remote fonts.
+- Geometry: 0–6px radii for most product surfaces; pills only where their semantics warrant them (for example the switch thumb/track).
+- Depth: borders, tonal steps and a single modal/toast shadow hierarchy. No backdrop-filter, glass sheen, glow or wallpaper.
+- File presentation: ruled workbench grid with shared borders instead of individually floating cards.
+- Navigation: active sidebar/settings state uses a narrow accent rule plus restrained fill.
+- Motion: roughly 130ms functional state feedback; no hover lift or cinematic repeated-use transitions.
+- Responsive: sidebar becomes a compact horizontal navigation strip; workbench grid becomes one column on narrow screens.
 
-## Verification
-- `backend/.venv/bin/python tests/test_all.py` — OK
-- `tests/test_regressions.py` — 0 bugs / 1 aviso previo (hilos del watcher)
-- `tests/test_security.py` — 0 explotables / 1 debilidad previa (S08 CSRF sin Origin)
-- Browser 1440 y 390: home, carpeta, settings, simulación, tema oscuro, consola limpia
-- Deduplicate ya no escanea al abrir la pestaña
+## Implementation
+Changed:
+- `frontend/styles.css` — complete visual-system replacement while retaining existing class/ID contracts.
+- removed `frontend/wallpaper-light.jpg`.
+- removed `frontend/wallpaper-dark.jpg`.
+- added `docs/agentit/REFERENCES.md`.
 
-## Next actions
-1. Abrir PR.
-2. Merge a criterio del usuario.
+Intentionally unchanged:
+- `frontend/app.js`.
+- `frontend/index.html` DOM/IDs and functional flows.
+- backend/database behavior.
 
-## Open questions / blockers
-Ninguno. Dirección visual confirmada por el usuario.
+The existing `.desktop-scene` DOM node remains only for compatibility and is forced to `display: none`; the active CSS contains no image-backed scene.
 
-## Recovery
-Checkpoint: dirección Liquid Glass decidida; bugs inventariados (Sortix leftover, `formatBytes` undefined, botón Ajustes se vacía, CSS de `.icon-btn`/simulación/stats ausente, confirmación de borrado dice “permanentemente” pero va a papelera, pestaña Duplicados dispara un scan al abrirla).
+## Verification gate
+Before completion/PR:
+1. Re-fetch branch CSS and confirm no `backdrop-filter`, wallpaper URL or gradient-based background remains.
+2. Confirm CSS braces/source structure and key responsive/focus/reduced-motion rules are present.
+3. Run or inspect available project CI/test evidence; do not claim browser-rendered visual success without browser evidence.
+4. Compare branch vs `main` and ensure scope is limited to the visual system, wallpaper removal and durable Agentit docs.
+
+## Superseded state
+The previous `facelift/liquid-glass` direction and merged PR #4 are historical only. Its UI bug fixes remain valuable, but its visual material language is intentionally superseded by this redesign.
+
+## Open items
+- Fresh verification.
+- Open PR against `main` after verification.
